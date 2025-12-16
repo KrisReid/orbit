@@ -1,0 +1,45 @@
+# ====================
+# Root .gitignore
+# ====================
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# Build outputs
+*.bak
+*.tmp
+*.temp
+
+# Secrets and credentials
+*.pem
+*.key
+secrets/
+credentials/
