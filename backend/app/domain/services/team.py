@@ -41,7 +41,7 @@ class TeamService:
             slug: Optional custom slug (auto-generated if not provided)
             
         Returns:
-            Created team
+            Created team with loaded relationships
             
         Raises:
             EntityAlreadyExistsError: If slug is already in use
@@ -52,11 +52,14 @@ class TeamService:
         if await self.team_repo.slug_exists(slug):
             raise EntityAlreadyExistsError("Team", "slug", slug)
         
-        return await self.team_repo.create(
+        team = await self.team_repo.create(
             name=name,
             slug=slug,
             description=description,
         )
+        
+        # Return team with loaded relationships for proper serialization
+        return await self.team_repo.get_with_members(team.id)
     
     async def get_team(self, team_id: int) -> Team:
         """Get a team by ID with members."""
@@ -100,9 +103,10 @@ class TeamService:
             updates["slug"] = slug
         
         if updates:
-            team = await self.team_repo.update(team, **updates)
+            await self.team_repo.update(team, **updates)
         
-        return team
+        # Return team with loaded relationships for proper serialization
+        return await self.team_repo.get_with_members(team_id)
     
     async def delete_team(self, team_id: int) -> None:
         """Delete a team."""

@@ -284,7 +284,7 @@ class TaskResponse(BaseModel):
 # --- Team Schemas ---
 class TeamMemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id: int
+    team_id: int
     user_id: int
     user: UserResponse | None = None
 
@@ -306,7 +306,7 @@ class TeamResponse(BaseModel):
     description: str | None = None
     created_at: datetime
     updated_at: datetime
-    members: list[TeamMemberResponse] = []
+    memberships: list[TeamMemberResponse] = []
     task_types: list[TaskTypeResponse] = []
 
 class TeamStatsResponse(BaseModel):

@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain.entities import Team, TeamMember, User
+from app.domain.entities import Team, TeamMember, User, TaskType
 from app.domain.repositories.base import BaseRepository
 
 
@@ -22,30 +22,39 @@ class TeamRepository(BaseRepository[Team]):
         query = (
             select(Team)
             .where(Team.slug == slug)
-            .options(selectinload(Team.memberships).selectinload(TeamMember.user))
+            .options(
+                selectinload(Team.memberships).selectinload(TeamMember.user),
+                selectinload(Team.task_types).selectinload(TaskType.fields),
+            )
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
     async def get_with_members(self, id: int) -> Team | None:
-        """Get a team with members eagerly loaded."""
+        """Get a team with members and task types eagerly loaded."""
         query = (
             select(Team)
             .where(Team.id == id)
-            .options(selectinload(Team.memberships).selectinload(TeamMember.user))
+            .options(
+                selectinload(Team.memberships).selectinload(TeamMember.user),
+                selectinload(Team.task_types).selectinload(TaskType.fields),
+            )
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
     
     async def get_all_with_members(
-        self, 
-        skip: int = 0, 
+        self,
+        skip: int = 0,
         limit: int = 100
     ) -> Sequence[Team]:
-        """Get all teams with members eagerly loaded."""
+        """Get all teams with members and task types eagerly loaded."""
         query = (
             select(Team)
-            .options(selectinload(Team.memberships).selectinload(TeamMember.user))
+            .options(
+                selectinload(Team.memberships).selectinload(TeamMember.user),
+                selectinload(Team.task_types).selectinload(TaskType.fields),
+            )
             .offset(skip)
             .limit(limit)
         )

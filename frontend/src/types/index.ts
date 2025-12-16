@@ -32,15 +32,14 @@ export interface Team {
 }
 
 export interface TeamMember {
-  id: number;
   user_id: number;
   team_id: number;
-  joined_at: string;
-  user: {
-    id: number;
-    email: string;
-    full_name: string;
-  };
+  user: User | null;
+}
+
+export interface TeamWithDetails extends Team {
+  memberships: TeamMember[];
+  task_types: TaskType[];
 }
 
 // Theme types
