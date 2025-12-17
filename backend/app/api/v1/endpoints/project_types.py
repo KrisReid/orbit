@@ -6,8 +6,9 @@ from app.api.deps import DbSession, CurrentUser, CurrentAdmin
 from app.domain.services import ProjectTypeService
 from app.domain.exceptions import EntityNotFoundError, EntityAlreadyExistsError
 from app.schemas import (
-    ProjectTypeCreate, ProjectTypeUpdate, ProjectTypeResponse, 
-    PaginatedResponse, MessageResponse, EntityStatsResponse, MigrationRequest
+    ProjectTypeCreate, ProjectTypeUpdate, ProjectTypeResponse,
+    PaginatedResponse, MessageResponse, EntityStatsResponse, MigrationRequest,
+    CustomFieldCreate, CustomFieldResponse, CustomFieldUpdate
 )
 
 router = APIRouter(prefix="/project-types", tags=["Project Types"])
@@ -80,3 +81,53 @@ async def migrate_project_type(id: int, data: MigrationRequest, db: DbSession, _
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# ============================================
+# Field Management Endpoints
+# ============================================
+
+@router.post("/{id}/fields", response_model=CustomFieldResponse, status_code=status.HTTP_201_CREATED)
+async def add_field(id: int, data: CustomFieldCreate, db: DbSession, _: CurrentAdmin):
+    """Add a custom field to a project type."""
+    try:
+        service = ProjectTypeService(db)
+        return await service.add_field(
+            project_type_id=id,
+            key=data.key,
+            label=data.label,
+            field_type=data.field_type,
+            options=data.options,
+            required=data.required,
+            order=data.order
+        )
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except EntityAlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
+@router.patch("/{id}/fields/{field_id}", response_model=CustomFieldResponse)
+async def update_field(id: int, field_id: int, data: CustomFieldUpdate, db: DbSession, _: CurrentAdmin):
+    """Update a custom field on a project type."""
+    try:
+        service = ProjectTypeService(db)
+        return await service.update_field(
+            project_type_id=id,
+            field_id=field_id,
+            label=data.label,
+            options=data.options,
+            required=data.required,
+            order=data.order
+        )
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+@router.delete("/{id}/fields/{field_id}", response_model=MessageResponse)
+async def delete_field(id: int, field_id: int, db: DbSession, _: CurrentAdmin):
+    """Delete a custom field from a project type."""
+    try:
+        service = ProjectTypeService(db)
+        await service.delete_field(project_type_id=id, field_id=field_id)
+        return MessageResponse(message="Field deleted successfully")
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

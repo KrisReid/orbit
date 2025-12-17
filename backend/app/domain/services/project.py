@@ -6,7 +6,8 @@ import re
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.entities import Project, ProjectType
+from app.domain.entities import Project, ProjectType, ProjectTypeField
+from app.domain.entities.base import FieldType
 from app.domain.exceptions import EntityNotFoundError, EntityAlreadyExistsError, ValidationError
 from app.domain.repositories import ProjectRepository, ProjectTypeRepository, ThemeRepository
 
@@ -66,6 +67,77 @@ class ProjectTypeService:
     async def delete_project_type(self, project_type_id: int) -> None:
         project_type = await self.get_project_type(project_type_id)
         await self.project_type_repo.delete(project_type)
+    
+    # --- Field Management ---
+    async def add_field(
+        self,
+        project_type_id: int,
+        key: str,
+        label: str,
+        field_type: FieldType,
+        options: list[str] | None = None,
+        required: bool = False,
+        order: int | None = None
+    ) -> ProjectTypeField:
+        """Add a custom field to a project type."""
+        # Verify project type exists
+        pt = await self.get_project_type(project_type_id)
+        
+        # Check for duplicate key
+        if await self.project_type_repo.field_key_exists(project_type_id, key):
+            raise EntityAlreadyExistsError("Field", "key", key)
+        
+        # Default order to end of list
+        if order is None:
+            order = len(pt.fields) if pt.fields else 0
+        
+        return await self.project_type_repo.add_field(
+            project_type_id=project_type_id,
+            key=key,
+            label=label,
+            field_type=field_type,
+            options=options,
+            required=required,
+            order=order
+        )
+    
+    async def update_field(
+        self,
+        project_type_id: int,
+        field_id: int,
+        label: str | None = None,
+        options: list[str] | None = None,
+        required: bool | None = None,
+        order: int | None = None
+    ) -> ProjectTypeField:
+        """Update an existing custom field."""
+        # Verify project type exists
+        await self.get_project_type(project_type_id)
+        
+        # Get existing field
+        field = await self.project_type_repo.get_field(project_type_id, field_id)
+        if not field:
+            raise EntityNotFoundError("Field", field_id)
+        
+        return await self.project_type_repo.update_field_by_id(
+            field_id=field_id,
+            label=label,
+            options=options,
+            required=required,
+            order=order
+        )
+    
+    async def delete_field(self, project_type_id: int, field_id: int) -> None:
+        """Delete a custom field from a project type."""
+        # Verify project type exists
+        await self.get_project_type(project_type_id)
+        
+        # Verify field exists
+        field = await self.project_type_repo.get_field(project_type_id, field_id)
+        if not field:
+            raise EntityNotFoundError("Field", field_id)
+        
+        await self.project_type_repo.delete_field(field_id)
 
     async def get_stats(self, id: int) -> dict:
         """

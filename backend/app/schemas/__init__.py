@@ -44,7 +44,13 @@ class CustomFieldBase(BaseModel):
     required: bool = False
 
 class CustomFieldCreate(CustomFieldBase):
-    pass
+    order: int | None = None
+
+class CustomFieldUpdate(BaseModel):
+    label: str | None = None
+    options: list[str] | None = None
+    required: bool | None = None
+    order: int | None = None
 
 class CustomFieldResponse(CustomFieldBase):
     model_config = ConfigDict(from_attributes=True)

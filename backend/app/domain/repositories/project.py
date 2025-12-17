@@ -69,8 +69,8 @@ class ProjectTypeRepository(BaseRepository[ProjectType]):
         return field
     
     async def update_fields(
-        self, 
-        project_type_id: int, 
+        self,
+        project_type_id: int,
         fields_data: list[dict]
     ) -> list[ProjectTypeField]:
         """Replace all fields for a project type."""
@@ -95,6 +95,59 @@ class ProjectTypeRepository(BaseRepository[ProjectType]):
         
         await self.session.flush()
         return fields
+    
+    async def field_key_exists(self, project_type_id: int, key: str) -> bool:
+        """Check if a field key already exists for a project type."""
+        query = select(ProjectTypeField.id).where(
+            ProjectTypeField.project_type_id == project_type_id,
+            ProjectTypeField.key == key
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none() is not None
+    
+    async def get_field(self, project_type_id: int, field_id: int) -> ProjectTypeField | None:
+        """Get a specific field by ID."""
+        query = select(ProjectTypeField).where(
+            ProjectTypeField.id == field_id,
+            ProjectTypeField.project_type_id == project_type_id
+        )
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def update_field_by_id(
+        self,
+        field_id: int,
+        label: str | None = None,
+        options: list[str] | None = None,
+        required: bool | None = None,
+        order: int | None = None
+    ) -> ProjectTypeField:
+        """Update a field by ID."""
+        query = select(ProjectTypeField).where(ProjectTypeField.id == field_id)
+        result = await self.session.execute(query)
+        field = result.scalar_one_or_none()
+        
+        if field:
+            if label is not None:
+                field.label = label
+            if options is not None:
+                field.options = options
+            if required is not None:
+                field.required = required
+            if order is not None:
+                field.order = order
+            await self.session.flush()
+            await self.session.refresh(field)
+        
+        return field
+    
+    async def delete_field(self, field_id: int) -> None:
+        """Delete a field by ID."""
+        from sqlalchemy import delete
+        await self.session.execute(
+            delete(ProjectTypeField).where(ProjectTypeField.id == field_id)
+        )
+        await self.session.flush()
 
 
 class ProjectRepository(BaseRepository[Project]):
