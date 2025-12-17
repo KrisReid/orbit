@@ -1,15 +1,54 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
+import {
+  FormModal,
+  EditFormModal,
+  TextInput,
+  Textarea,
+  SelectInput,
+} from '@/components/ui';
+
+interface Team {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+}
+
+interface TeamStats {
+  task_count: number;
+  task_type_count: number;
+  is_unassigned_team: boolean;
+}
 
 export function TeamsSettings() {
   const queryClient = useQueryClient();
-  const [showModal, setShowModal] = useState(false);
-  const [editingTeam, setEditingTeam] = useState<{ id: number; name: string; slug: string; description?: string | null } | null>(null);
-  const [deleteTeam, setDeleteTeam] = useState<{ id: number; name: string } | null>(null);
-  const [teamStats, setTeamStats] = useState<{ task_count: number; task_type_count: number; is_unassigned_team: boolean } | null>(null);
+  
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [deleteTeam, setDeleteTeam] = useState<Team | null>(null);
+  const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
   const [reassignTo, setReassignTo] = useState<number | undefined>(undefined);
+
+  // Create form state
+  const [createName, setCreateName] = useState('');
+  const [createSlug, setCreateSlug] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+
+  // Edit form state
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+
+  // Sync edit form when editingTeam changes
+  useEffect(() => {
+    if (editingTeam) {
+      setEditName(editingTeam.name);
+      setEditDescription(editingTeam.description || '');
+    }
+  }, [editingTeam]);
 
   const { data: teams, isLoading } = useQuery({
     queryKey: ['teams'],
@@ -20,7 +59,7 @@ export function TeamsSettings() {
     mutationFn: api.teams.create,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
-      setShowModal(false);
+      handleCloseCreate();
     },
   });
 
@@ -38,12 +77,44 @@ export function TeamsSettings() {
       api.teams.delete(id, reassignTasksTo),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
-      setDeleteTeam(null);
-      setTeamStats(null);
+      handleCloseDelete();
     },
   });
 
-  const handleDeleteClick = async (team: { id: number; name: string; slug: string }) => {
+  // Handlers
+  const handleCloseCreate = () => {
+    setShowCreateModal(false);
+    setCreateName('');
+    setCreateSlug('');
+    setCreateDescription('');
+  };
+
+  const handleCreateSubmit = () => {
+    createMutation.mutate({
+      name: createName,
+      slug: createSlug,
+      description: createDescription || undefined,
+    });
+  };
+
+  const handleNameChange = (value: string) => {
+    setCreateName(value);
+    // Auto-generate slug from name
+    setCreateSlug(value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+  };
+
+  const handleEditSubmit = () => {
+    if (!editingTeam) return;
+    updateMutation.mutate({
+      id: editingTeam.id,
+      data: {
+        name: editName,
+        description: editDescription || undefined,
+      },
+    });
+  };
+
+  const handleDeleteClick = async (team: Team) => {
     try {
       const stats = await api.teams.getStats(team.id);
       setTeamStats(stats);
@@ -53,22 +124,47 @@ export function TeamsSettings() {
     }
   };
 
+  const handleCloseDelete = () => {
+    setDeleteTeam(null);
+    setTeamStats(null);
+    setReassignTo(undefined);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteTeam) return;
+    deleteMutation.mutate({
+      id: deleteTeam.id,
+      reassignTasksTo: reassignTo,
+    });
+  };
+
   if (isLoading) {
     return <div className="animate-pulse h-64 bg-gray-100 dark:bg-gray-800 rounded-xl" />;
   }
 
+  const otherTeams = teams?.items?.filter(t => t.id !== deleteTeam?.id) || [];
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Teams</h2>
-        <button onClick={() => setShowModal(true)} className="inline-flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700">
-          <Plus className="h-4 w-4 mr-1" />Add Team
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="inline-flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700"
+        >
+          <Plus className="h-4 w-4 mr-1" />
+          Add Team
         </button>
       </div>
 
+      {/* Teams Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {teams?.items?.map((team) => (
-          <div key={team.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+          <div
+            key={team.id}
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4"
+          >
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-medium text-gray-900 dark:text-white">{team.name}</h3>
@@ -91,183 +187,126 @@ export function TeamsSettings() {
                 )}
               </div>
             </div>
-            {team.description && <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{team.description}</p>}
+            {team.description && (
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{team.description}</p>
+            )}
           </div>
         ))}
       </div>
 
-      {showModal && (
-        <TeamModal onClose={() => setShowModal(false)} onSubmit={(data) => createMutation.mutate(data)} isLoading={createMutation.isPending} />
-      )}
-
-      {editingTeam && (
-        <TeamEditModal
-          team={editingTeam}
-          onClose={() => setEditingTeam(null)}
-          onSubmit={(data) => updateMutation.mutate({ id: editingTeam.id, data })}
-          isLoading={updateMutation.isPending}
-        />
-      )}
-
-      {deleteTeam && teamStats && (
-        <TeamDeleteModal
-          team={deleteTeam}
-          stats={teamStats}
-          teams={teams?.items?.filter(t => t.id !== deleteTeam.id) || []}
-          reassignTo={reassignTo}
-          setReassignTo={setReassignTo}
-          onClose={() => { setDeleteTeam(null); setTeamStats(null); setReassignTo(undefined); }}
-          onConfirm={() => deleteMutation.mutate({ id: deleteTeam.id, reassignTasksTo: reassignTo })}
-          isLoading={deleteMutation.isPending}
-        />
-      )}
-    </div>
-  );
-}
-
-function TeamModal({ onClose, onSubmit, isLoading }: { onClose: () => void; onSubmit: (data: { name: string; slug: string; description?: string }) => void; isLoading: boolean }) {
-  const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [description, setDescription] = useState('');
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-        <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add Team</h2>
-          <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name, slug, description: description || undefined }); }} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-              <input type="text" required value={name} onChange={(e) => { setName(e.target.value); setSlug(e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')); }} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Slug</label>
-              <input type="text" required pattern="[a-z0-9\-]+" value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-            </div>
-            <div className="flex justify-end space-x-3 pt-4">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 dark:text-gray-300 rounded-lg">Cancel</button>
-              <button type="submit" disabled={isLoading} className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50">{isLoading ? 'Creating...' : 'Create'}</button>
-            </div>
-          </form>
+      {/* Create Team Modal */}
+      <FormModal
+        isOpen={showCreateModal}
+        onClose={handleCloseCreate}
+        onSubmit={handleCreateSubmit}
+        title="Add Team"
+        submitLabel="Create"
+        loadingLabel="Creating..."
+        isLoading={createMutation.isPending}
+      >
+        <div className="space-y-4">
+          <TextInput
+            label="Name"
+            required
+            value={createName}
+            onChange={(e) => handleNameChange(e.target.value)}
+            placeholder="Engineering"
+          />
+          <TextInput
+            label="Slug"
+            required
+            pattern="[a-z0-9-]+"
+            value={createSlug}
+            onChange={(e) => setCreateSlug(e.target.value)}
+            placeholder="engineering"
+          />
+          <Textarea
+            label="Description"
+            value={createDescription}
+            onChange={(e) => setCreateDescription(e.target.value)}
+            rows={2}
+            placeholder="Team description..."
+          />
         </div>
-      </div>
-    </div>
-  );
-}
+      </FormModal>
 
-function TeamEditModal({ team, onClose, onSubmit, isLoading }: {
-  team: { id: number; name: string; slug: string; description?: string | null };
-  onClose: () => void;
-  onSubmit: (data: { name?: string; description?: string }) => void;
-  isLoading: boolean;
-}) {
-  const [name, setName] = useState(team.name);
-  const [description, setDescription] = useState(team.description || '');
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-        <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Edit Team</h2>
-          <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name, description: description || undefined }); }} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-              <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Slug</label>
-              <input type="text" disabled value={team.slug} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-500" />
-              <p className="text-xs text-gray-500 mt-1">Slug cannot be changed</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" />
-            </div>
-            <div className="flex justify-end space-x-3 pt-4">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 dark:text-gray-300 rounded-lg">Cancel</button>
-              <button type="submit" disabled={isLoading} className="px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50">{isLoading ? 'Saving...' : 'Save'}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TeamDeleteModal({
-  team,
-  stats,
-  teams,
-  reassignTo,
-  setReassignTo,
-  onClose,
-  onConfirm,
-  isLoading
-}: {
-  team: { id: number; name: string };
-  stats: { task_count: number; task_type_count: number; is_unassigned_team: boolean };
-  teams: Array<{ id: number; name: string; slug: string }>;
-  reassignTo: number | undefined;
-  setReassignTo: (id: number | undefined) => void;
-  onClose: () => void;
-  onConfirm: () => void;
-  isLoading: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-        <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Delete Team</h2>
-          
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-            <p className="text-sm text-red-800 dark:text-red-200">
-              Are you sure you want to delete <strong>{team.name}</strong>?
-            </p>
+      {/* Edit Team Modal */}
+      <EditFormModal
+        isOpen={!!editingTeam}
+        onClose={() => setEditingTeam(null)}
+        onSubmit={handleEditSubmit}
+        title="Edit Team"
+        isLoading={updateMutation.isPending}
+      >
+        <div className="space-y-4">
+          <TextInput
+            label="Name"
+            required
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Slug
+            </label>
+            <input
+              type="text"
+              disabled
+              value={editingTeam?.slug || ''}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">Slug cannot be changed</p>
           </div>
+          <Textarea
+            label="Description"
+            value={editDescription}
+            onChange={(e) => setEditDescription(e.target.value)}
+            rows={2}
+          />
+        </div>
+      </EditFormModal>
 
-          {stats.task_count > 0 && (
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                This team has <strong>{stats.task_count} tasks</strong> and <strong>{stats.task_type_count} task types</strong>.
-              </p>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Reassign tasks to:
-              </label>
-              <select
-                value={reassignTo || ''}
-                onChange={(e) => setReassignTo(e.target.value ? Number(e.target.value) : undefined)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              >
-                <option value="">Unassigned Team (default)</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Task types will be deleted. Tasks will be migrated to the target team's default task type.
+      {/* Delete Team Modal - uses FormModal since it needs custom content */}
+      <FormModal
+        isOpen={!!deleteTeam && !!teamStats}
+        onClose={handleCloseDelete}
+        onSubmit={handleConfirmDelete}
+        title="Delete Team"
+        submitLabel="Delete"
+        loadingLabel="Deleting..."
+        isLoading={deleteMutation.isPending}
+      >
+        {deleteTeam && teamStats && (
+          <div className="space-y-4">
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+              <p className="text-sm text-red-800 dark:text-red-200">
+                Are you sure you want to delete <strong>{deleteTeam.name}</strong>?
               </p>
             </div>
-          )}
 
-          <div className="flex justify-end space-x-3 pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 dark:text-gray-300 rounded-lg">Cancel</button>
-            <button
-              onClick={onConfirm}
-              disabled={isLoading}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-            >
-              {isLoading ? 'Deleting...' : 'Delete Team'}
-            </button>
+            {teamStats.task_count > 0 && (
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  This team has <strong>{teamStats.task_count} tasks</strong> and{' '}
+                  <strong>{teamStats.task_type_count} task types</strong>.
+                </p>
+                <SelectInput
+                  label="Reassign tasks to"
+                  value={reassignTo?.toString() || ''}
+                  onChange={(e) => setReassignTo(e.target.value ? Number(e.target.value) : undefined)}
+                  options={[
+                    { value: '', label: 'Unassigned Team (default)' },
+                    ...otherTeams.map((t) => ({ value: t.id.toString(), label: t.name })),
+                  ]}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Task types will be deleted. Tasks will be migrated to the target team's default task type.
+                </p>
+              </div>
+            )}
           </div>
-        </div>
-      </div>
+        )}
+      </FormModal>
     </div>
   );
 }
