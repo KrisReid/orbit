@@ -153,6 +153,7 @@ class ProjectUpdate(BaseModel):
     description: str | None = None
     status: str | None = None
     theme_id: int | None = None
+    project_type_id: int | None = None
     custom_data: dict[str, Any] | None = None
 
 class ThemeSummary(BaseModel):

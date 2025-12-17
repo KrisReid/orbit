@@ -93,6 +93,9 @@ async def update_project(
     
     Note: To unlink a project from a theme, explicitly set theme_id to null.
     This is different from not providing the field at all.
+    
+    Note: Changing project_type_id will reset status to first workflow state
+    and clear all custom_data.
     """
     try:
         service = ProjectService(db)
@@ -113,6 +116,8 @@ async def update_project(
             update_kwargs["clear_theme"] = data.theme_id is None
         if "custom_data" in data.model_fields_set:
             update_kwargs["custom_data"] = data.custom_data
+        if "project_type_id" in data.model_fields_set:
+            update_kwargs["project_type_id"] = data.project_type_id
         
         return await service.update_project(**update_kwargs)
     except EntityNotFoundError as e:

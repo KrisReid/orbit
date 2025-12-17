@@ -241,14 +241,38 @@ class ProjectService:
         )
         return list(projects), total
     
-    async def update_project(self, project_id: int, title: str = None, description: str = None, status: str = None, theme_id: int = None, clear_theme: bool = False, custom_data: dict[str, Any] = None) -> Project:
+    async def update_project(
+        self,
+        project_id: int,
+        title: str = None,
+        description: str = None,
+        status: str = None,
+        theme_id: int = None,
+        clear_theme: bool = False,
+        custom_data: dict[str, Any] = None,
+        project_type_id: int = None
+    ) -> Project:
         project = await self.get_project(project_id)
         updates = {}
         
         if title is not None: updates["title"] = title
         if description is not None: updates["description"] = description
-        if status is not None: updates["status"] = status
         if custom_data is not None: updates["custom_data"] = custom_data
+        
+        # Handle project type change
+        if project_type_id is not None and project_type_id != project.project_type_id:
+            new_project_type = await self.project_type_repo.get_with_fields(project_type_id)
+            if not new_project_type:
+                raise EntityNotFoundError("ProjectType", project_type_id)
+            
+            updates["project_type_id"] = project_type_id
+            # Reset status to first workflow status of new type
+            updates["status"] = new_project_type.workflow[0] if new_project_type.workflow else "New"
+            # Clear custom data as fields are type-specific
+            updates["custom_data"] = {}
+        elif status is not None:
+            # Only update status if not changing project type
+            updates["status"] = status
         
         if clear_theme:
             updates["theme_id"] = None
@@ -260,7 +284,7 @@ class ProjectService:
         
         if updates:
             project = await self.project_repo.update(project, **updates)
-        return project
+        return await self.project_repo.get_with_relations(project_id)
     
     async def delete_project(self, project_id: int) -> None:
         project = await self.get_project(project_id)
