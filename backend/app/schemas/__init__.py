@@ -90,6 +90,7 @@ class TaskTypeBase(BaseModel):
     color: str | None = None
 
 class TaskTypeCreate(TaskTypeBase):
+    team_id: int
     slug: str | None = None
     fields: list[CustomFieldCreate] | None = None
 

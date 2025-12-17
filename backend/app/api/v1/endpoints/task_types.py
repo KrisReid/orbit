@@ -46,7 +46,10 @@ async def create_task_type(
     db: DbSession,
     _: CurrentAdmin,
 ):
-    """Create a new task type. Admin only."""
+    """Create a new task type. Admin only.
+    
+    The team_id is now included in the request body.
+    """
     try:
         service = TaskTypeService(db)
         # Convert field schemas to dicts
