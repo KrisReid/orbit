@@ -109,21 +109,40 @@ async def update_task(
     db: DbSession,
     _: CurrentUser,
 ):
-    """Update a task."""
+    """Update a task.
+    
+    Note: To unlink a task from a project/release, explicitly set the field to null.
+    This is different from not providing the field at all.
+    """
     try:
         service = TaskService(db)
-        return await service.update_task(
-            task_id=task_id,
-            title=data.title,
-            description=data.description,
-            status=data.status,
-            team_id=data.team_id,
-            task_type_id=data.task_type_id,
-            project_id=data.project_id,
-            release_id=data.release_id,
-            estimation=data.estimation,
-            custom_data=data.custom_data,
-        )
+        
+        # Build update kwargs only from fields that were explicitly provided
+        # This allows distinguishing between "not provided" and "explicitly null"
+        update_kwargs: dict = {"task_id": task_id}
+        
+        if "title" in data.model_fields_set:
+            update_kwargs["title"] = data.title
+        if "description" in data.model_fields_set:
+            update_kwargs["description"] = data.description
+        if "status" in data.model_fields_set:
+            update_kwargs["status"] = data.status
+        if "team_id" in data.model_fields_set:
+            update_kwargs["team_id"] = data.team_id
+        if "task_type_id" in data.model_fields_set:
+            update_kwargs["task_type_id"] = data.task_type_id
+        if "project_id" in data.model_fields_set:
+            update_kwargs["project_id"] = data.project_id
+            update_kwargs["clear_project"] = data.project_id is None
+        if "release_id" in data.model_fields_set:
+            update_kwargs["release_id"] = data.release_id
+            update_kwargs["clear_release"] = data.release_id is None
+        if "estimation" in data.model_fields_set:
+            update_kwargs["estimation"] = data.estimation
+        if "custom_data" in data.model_fields_set:
+            update_kwargs["custom_data"] = data.custom_data
+        
+        return await service.update_task(**update_kwargs)
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 

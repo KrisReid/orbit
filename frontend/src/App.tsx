@@ -8,7 +8,6 @@ import { Layout } from '@/components/Layout';
 
 // Pages
 import { LoginPage } from '@/pages/LoginPage';
-import { DashboardPage } from '@/pages/DashboardPage';
 import { ThemesPage } from '@/pages/ThemesPage';
 import { ThemeDetailPage } from '@/pages/ThemeDetailPage';
 import { ProjectsPage } from '@/pages/ProjectsPage';
@@ -63,7 +62,7 @@ function AppContent() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<DashboardPage />} />
+        <Route index element={<Navigate to="/projects" replace />} />
         <Route path="themes" element={<ThemesPage />} />
         <Route path="themes/:id" element={<ThemeDetailPage />} />
         <Route path="projects" element={<ProjectsPage />} />

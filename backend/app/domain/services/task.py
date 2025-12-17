@@ -307,8 +307,15 @@ class TaskService:
         release_id: int | None = None,
         estimation: str | None = None,
         custom_data: dict[str, Any] | None = None,
+        clear_project: bool = False,
+        clear_release: bool = False,
     ) -> Task:
-        """Update a task."""
+        """Update a task.
+        
+        Args:
+            clear_project: If True, explicitly unlink from project (set to null)
+            clear_release: If True, explicitly unlink from release (set to null)
+        """
         task = await self.get_task(task_id)
         
         # Verify foreign keys if being changed
@@ -323,16 +330,14 @@ class TaskService:
                 raise EntityNotFoundError("TaskType", task_type_id)
         
         if project_id is not None and project_id != task.project_id:
-            if project_id:
-                project = await self.project_repo.get_by_id(project_id)
-                if not project:
-                    raise EntityNotFoundError("Project", project_id)
+            project = await self.project_repo.get_by_id(project_id)
+            if not project:
+                raise EntityNotFoundError("Project", project_id)
         
         if release_id is not None and release_id != task.release_id:
-            if release_id:
-                release = await self.release_repo.get_by_id(release_id)
-                if not release:
-                    raise EntityNotFoundError("Release", release_id)
+            release = await self.release_repo.get_by_id(release_id)
+            if not release:
+                raise EntityNotFoundError("Release", release_id)
         
         updates = {}
         if title is not None:
@@ -346,9 +351,13 @@ class TaskService:
         if task_type_id is not None:
             updates["task_type_id"] = task_type_id
         if project_id is not None:
-            updates["project_id"] = project_id if project_id else None
+            updates["project_id"] = project_id
+        elif clear_project:
+            updates["project_id"] = None
         if release_id is not None:
-            updates["release_id"] = release_id if release_id else None
+            updates["release_id"] = release_id
+        elif clear_release:
+            updates["release_id"] = None
         if estimation is not None:
             updates["estimation"] = estimation
         if custom_data is not None:

@@ -196,9 +196,18 @@ class ProjectResponse(ProjectBase):
     created_at: datetime
     updated_at: datetime
 
+class TaskSummary(BaseModel):
+    """Summary of a task for inclusion in project details."""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    display_id: str
+    title: str
+    status: str
+
 class ProjectDetailResponse(ProjectResponse):
     dependencies: list[ProjectSummary] = []
     dependents: list[ProjectSummary] = []
+    tasks: list[TaskSummary] = []
 
 # --- Release Schemas ---
 class ReleaseBase(BaseModel):

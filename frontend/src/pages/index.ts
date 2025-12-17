@@ -1,6 +1,5 @@
 // Page exports
 export { LoginPage } from './LoginPage';
-export { DashboardPage } from './DashboardPage';
 export { ThemesPage } from './ThemesPage';
 export { ThemeDetailPage } from './ThemeDetailPage';
 export { ProjectsPage } from './ProjectsPage';

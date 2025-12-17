@@ -5,7 +5,6 @@ import { useAuthStore } from '@/stores/auth';
 import { useThemeStore } from '@/stores/theme';
 import { api } from '@/api/client';
 import {
-  LayoutDashboard,
   Target,
   FolderKanban,
   Rocket,
@@ -41,7 +40,6 @@ function savePinnedBoards(slugs: string[]): void {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Themes', href: '/themes', icon: Target },
   { name: 'Projects', href: '/projects', icon: FolderKanban },
   { name: 'Releases', href: '/releases', icon: Rocket },
@@ -118,7 +116,7 @@ export function Layout() {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-700">
-            <Link to="/" className="flex items-center gap-2">
+            <Link to="/projects" className="flex items-center gap-2">
               <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center shadow-sm">
                 <span className="text-white font-bold text-sm">PM</span>
               </div>
@@ -135,9 +133,7 @@ export function Layout() {
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
-              const isActive = item.href === '/'
-                ? location.pathname === '/'
-                : location.pathname.startsWith(item.href);
+              const isActive = location.pathname.startsWith(item.href);
 
               return (
                 <Link
