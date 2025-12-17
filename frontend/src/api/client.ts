@@ -252,7 +252,7 @@ class ApiClient {
       statusMappings: Array<{ old_status: string; new_status: string }>
     ): Promise<MessageResponse> => {
       const response = await this.client.post<MessageResponse>(`/project-types/${id}/migrate`, {
-        target_project_type_id: targetTypeId,
+        target_id: targetTypeId,
         status_mappings: statusMappings,
       });
       return response.data;
@@ -408,7 +408,7 @@ class ApiClient {
       statusMappings: Array<{ old_status: string; new_status: string }>
     ): Promise<MessageResponse> => {
       const response = await this.client.post<MessageResponse>(`/task-types/${id}/migrate`, {
-        target_task_type_id: targetTypeId,
+        target_id: targetTypeId,
         status_mappings: statusMappings,
       });
       return response.data;
