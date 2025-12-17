@@ -7,7 +7,7 @@ from app.domain.services import ProjectTypeService
 from app.domain.exceptions import EntityNotFoundError, EntityAlreadyExistsError
 from app.schemas import (
     ProjectTypeCreate, ProjectTypeUpdate, ProjectTypeResponse,
-    PaginatedResponse, MessageResponse, EntityStatsResponse, MigrationRequest,
+    PaginatedResponse, MessageResponse, ProjectTypeStatsResponse, MigrationRequest,
     CustomFieldCreate, CustomFieldResponse, CustomFieldUpdate
 )
 
@@ -60,7 +60,7 @@ async def delete_project_type(id: int, db: DbSession, _: CurrentAdmin):
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
-@router.get("/{id}/stats", response_model=EntityStatsResponse)
+@router.get("/{id}/stats", response_model=ProjectTypeStatsResponse)
 async def get_project_type_stats(id: int, db: DbSession, _: CurrentUser):
     """Used by UI Settings to show impact before deletion/migration."""
     try:

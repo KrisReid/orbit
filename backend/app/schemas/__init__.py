@@ -35,6 +35,21 @@ class EntityStatsResponse(BaseModel):
     total_items: int
     items_by_status: dict[str, int]
 
+class ProjectTypeStatsResponse(BaseModel):
+    project_type_id: int
+    project_type_name: str
+    workflow: list[str]
+    total_projects: int
+    projects_by_status: dict[str, int]
+
+class TaskTypeStatsResponse(BaseModel):
+    task_type_id: int
+    task_type_name: str
+    team_id: int
+    workflow: list[str]
+    total_tasks: int
+    tasks_by_status: dict[str, int]
+
 # --- Project Type Schemas ---
 class CustomFieldBase(BaseModel):
     key: str

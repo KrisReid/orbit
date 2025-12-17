@@ -146,7 +146,7 @@ class ProjectTypeService:
         pt = await self.get_project_type(id)
         
         # Logic to count items by status
-        projects, _ = await self.project_repo.get_all_filtered(limit=10000, project_type_ids=[id])
+        projects = await self.project_repo.get_all_filtered(limit=10000, project_type_ids=[id])
         
         stats = {status: 0 for status in pt.workflow}
         for p in projects:
@@ -156,11 +156,11 @@ class ProjectTypeService:
                 stats[p.status] = 1 # Handle unknown statuses
         
         return {
-            "id": pt.id,
-            "name": pt.name,
+            "project_type_id": pt.id,
+            "project_type_name": pt.name,
             "workflow": pt.workflow,
-            "total_items": len(projects),
-            "items_by_status": stats
+            "total_projects": len(projects),
+            "projects_by_status": stats
         }
 
     async def migrate_projects(self, current_type_id: int, target_type_id: int, status_map: dict[str, str]) -> int:
@@ -180,7 +180,7 @@ class ProjectTypeService:
                 raise ValidationError(f"Target status '{new_status}' not in target workflow")
 
         # Perform Migration
-        projects, _ = await self.project_repo.get_all_filtered(limit=10000, project_type_ids=[current_type_id])
+        projects = await self.project_repo.get_all_filtered(limit=10000, project_type_ids=[current_type_id])
         
         migrated_count = 0
         default_status = target_pt.workflow[0] if target_pt.workflow else "New"

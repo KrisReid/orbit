@@ -10,8 +10,10 @@ from app.schemas import (
     TaskTypeCreate,
     TaskTypeUpdate,
     TaskTypeResponse,
+    TaskTypeStatsResponse,
     PaginatedResponse,
     MessageResponse,
+    MigrationRequest,
 )
 
 router = APIRouter(prefix="/task-types", tags=["Task Types"])
@@ -125,3 +127,36 @@ async def delete_task_type(
         return MessageResponse(message="Task type deleted successfully")
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.get("/{task_type_id}/stats", response_model=TaskTypeStatsResponse)
+async def get_task_type_stats(
+    task_type_id: int,
+    db: DbSession,
+    _: CurrentUser,
+):
+    """Get statistics for a task type. Used by UI Settings before deletion/migration."""
+    try:
+        service = TaskTypeService(db)
+        return await service.get_stats(task_type_id)
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/{task_type_id}/migrate", response_model=MessageResponse)
+async def migrate_task_type(
+    task_type_id: int,
+    data: MigrationRequest,
+    db: DbSession,
+    _: CurrentAdmin,
+):
+    """Migrate tasks to a new type so this one can be safely deleted. Admin only."""
+    try:
+        service = TaskTypeService(db)
+        status_map = {m.old_status: m.new_status for m in data.status_mappings}
+        count = await service.migrate_tasks(task_type_id, data.target_id, status_map)
+        return MessageResponse(message=f"Successfully migrated {count} tasks.")
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

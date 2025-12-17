@@ -125,6 +125,66 @@ class TaskTypeService:
         """Delete a task type."""
         task_type = await self.get_task_type(task_type_id)
         await self.task_type_repo.delete(task_type)
+    
+    async def get_stats(self, task_type_id: int) -> dict:
+        """Get statistics for a task type."""
+        task_type = await self.get_task_type(task_type_id)
+        
+        # Get task repository to count tasks
+        task_repo = TaskRepository(self.session)
+        
+        # Count tasks by status for this task type
+        tasks_by_status = {}
+        total_tasks = 0
+        
+        for status in task_type.workflow:
+            count = await task_repo.count_filtered(task_type_id=task_type_id, statuses=[status])
+            tasks_by_status[status] = count
+            total_tasks += count
+        
+        return {
+            "task_type_id": task_type.id,
+            "task_type_name": task_type.name,
+            "team_id": task_type.team_id,
+            "workflow": task_type.workflow,
+            "total_tasks": total_tasks,
+            "tasks_by_status": tasks_by_status,
+        }
+    
+    async def migrate_tasks(
+        self,
+        source_type_id: int,
+        target_type_id: int,
+        status_mappings: dict[str, str],
+    ) -> int:
+        """Migrate tasks from one task type to another with status mapping."""
+        # Verify both task types exist
+        source_type = await self.get_task_type(source_type_id)
+        target_type = await self.get_task_type(target_type_id)
+        
+        # Get task repository
+        task_repo = TaskRepository(self.session)
+        
+        # Get all tasks of source type
+        tasks = await task_repo.get_all_filtered(
+            task_type_id=source_type_id,
+            limit=10000  # High limit to get all
+        )
+        
+        # Migrate each task
+        count = 0
+        for task in tasks:
+            old_status = task.status
+            new_status = status_mappings.get(old_status, target_type.workflow[0] if target_type.workflow else "Backlog")
+            
+            await task_repo.update(
+                task,
+                task_type_id=target_type_id,
+                status=new_status,
+            )
+            count += 1
+        
+        return count
 
 
 class TaskService:
