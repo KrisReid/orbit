@@ -104,3 +104,28 @@ async def update_user(
         
     user = await repo.update(user, **updates)
     return user
+
+@router.delete("/{user_id}")
+async def delete_user(
+    user_id: int,
+    db: DbSession,
+    current_user: CurrentAdmin,
+) -> Any:
+    """Delete a user by ID. Admins cannot delete themselves."""
+    repo = UserRepository(db)
+    user = await repo.get_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    
+    # Prevent admins from deleting themselves
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account",
+        )
+    
+    await repo.delete(user)
+    return {"message": "User deleted successfully"}
