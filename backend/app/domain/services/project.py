@@ -215,7 +215,7 @@ class ProjectService:
             if not theme:
                 raise EntityNotFoundError("Theme", theme_id)
         
-        return await self.project_repo.create(
+        project = await self.project_repo.create(
             title=title,
             description=description,
             project_type_id=project_type_id,
@@ -223,6 +223,8 @@ class ProjectService:
             status=default_status,
             custom_data=custom_data,
         )
+        # Return with relations loaded for the response schema
+        return await self.project_repo.get_with_relations(project.id)
     
     async def get_project(self, project_id: int) -> Project:
         project = await self.project_repo.get_with_relations(project_id)
