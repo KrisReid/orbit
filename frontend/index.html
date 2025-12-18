@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Core PM</title>
+    <title>Orbit</title>
     <script>
       // Theme initialization - runs before page renders to prevent flash
       (function() {
@@ -12,7 +12,7 @@
         document.documentElement.classList.remove('dark');
         
         try {
-          var stored = localStorage.getItem('core-pm-theme');
+          var stored = localStorage.getItem('orbit-theme');
           if (stored) {
             var data = JSON.parse(stored);
             var theme = data.state && data.state.theme;

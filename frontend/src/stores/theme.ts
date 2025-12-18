@@ -40,7 +40,7 @@ export const useThemeStore = create<ThemeState>()(
       },
     }),
     {
-      name: 'core-pm-theme',
+      name: 'orbit-theme',
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
         // Apply theme after rehydration
@@ -62,7 +62,7 @@ if (typeof window !== 'undefined') {
   });
   
   // Apply stored theme on initial load
-  const stored = localStorage.getItem('core-pm-theme');
+  const stored = localStorage.getItem('orbit-theme');
   if (stored) {
     try {
       const parsed = JSON.parse(stored);

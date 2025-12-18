@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     )
     
     # Application
-    APP_NAME: str = "Core PM"
+    APP_NAME: str = "Orbit"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     API_V1_PREFIX: str = "/api/v1"
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/corepm"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/orbit"
     DATABASE_ECHO: bool = False
     
     # CORS - stored as comma-separated string, parsed in property

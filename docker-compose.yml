@@ -4,17 +4,17 @@ services:
   # Strong Database
   db:
     image: postgres:16-alpine
-    container_name: corepm-db
+    container_name: orbit-db
     environment:
-      POSTGRES_USER: corepm
-      POSTGRES_PASSWORD: corepm_secret
-      POSTGRES_DB: corepm
+      POSTGRES_USER: orbit
+      POSTGRES_PASSWORD: orbit_secret
+      POSTGRES_DB: orbit
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U corepm"]
+      test: ["CMD-SHELL", "pg_isready -U orbit"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,14 +24,14 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: corepm-backend
+    container_name: orbit-backend
     environment:
-      DATABASE_URL: postgresql+asyncpg://corepm:corepm_secret@db:5432/corepm
+      DATABASE_URL: postgresql+asyncpg://orbit:orbit_secret@db:5432/orbit
       SECRET_KEY: dev-secret-key
       # Allow both frontend URLs (container and local)
       CORS_ORIGINS: http://localhost:3000,http://localhost:80,http://127.0.0.1:3000
       DEBUG: "true"
-      TASK_ID_PREFIX: CORE
+      TASK_ID_PREFIX: ORBIT
     ports:
       - "8000:8000"
     depends_on:
@@ -46,7 +46,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
-    container_name: corepm-frontend
+    container_name: orbit-frontend
     environment:
       # Directs the frontend to the backend container
       - VITE_API_URL=http://localhost:8000/api/v1

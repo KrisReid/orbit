@@ -1,4 +1,4 @@
-# Contributing to Core PM
+# Contributing to Orbit
 
 Thanks for your interest in contributing! This guide will help you get started.
 
@@ -28,7 +28,7 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Set environment variables
-export DATABASE_URL="postgresql+asyncpg://corepm:corepm_secret@localhost:5432/corepm"
+export DATABASE_URL="postgresql+asyncpg://orbit:orbit_secret@localhost:5432/orbit"
 export SECRET_KEY="dev-secret-key"
 
 # Run migrations and seed

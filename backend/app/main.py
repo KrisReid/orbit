@@ -1,5 +1,5 @@
 """
-Core PM - FastAPI Application
+Orbit - FastAPI Application
 
 An open-source, engineer-friendly project management tool.
 """

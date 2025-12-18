@@ -1,10 +1,10 @@
-# Core PM
+# Orbit
 
 An open-source, engineer-friendly project management tool built with FastAPI and React.
 
 ## Overview
 
-Core PM is a flexible project management system designed for engineering teams. It supports customizable workflows, team-based task management, and strategic initiative tracking through themes and projects.
+Orbit is a flexible project management system designed for engineering teams. It supports customizable workflows, team-based task management, and strategic initiative tracking through themes and projects.
 
 ### Key Features
 
@@ -27,8 +27,8 @@ Core PM is a flexible project management system designed for engineering teams. 
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/core-pm.git
-cd core-pm
+git clone https://github.com/your-org/orbit.git
+cd orbit
 
 # Start all services
 docker-compose up
@@ -42,7 +42,7 @@ docker-compose up
 ### Default Login
 
 ```
-Email: admin@corepm.example.com
+Email: admin@orbit.example.com
 Password: admin123
 ```
 
@@ -61,7 +61,7 @@ The database is seeded with sample data including users, teams, projects, and ta
 ## Project Structure
 
 ```
-core-pm/
+orbit/
 ├── backend/
 │   ├── app/
 │   │   ├── api/v1/endpoints/    # REST endpoints
@@ -133,7 +133,7 @@ Team
 | `SECRET_KEY` | JWT signing key | (required) |
 | `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` |
 | `DEBUG` | Enable debug mode | `false` |
-| `TASK_ID_PREFIX` | Prefix for task display IDs | `CORE` |
+| `TASK_ID_PREFIX` | Prefix for task display IDs | `ORBIT` |
 
 ## Documentation
 

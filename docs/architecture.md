@@ -1,6 +1,6 @@
 # Architecture Guide
 
-This document describes the technical architecture of Core PM.
+This document describes the technical architecture of Orbit.
 
 ## System Overview
 
@@ -122,7 +122,7 @@ engine = create_async_engine(
 | ProjectType | Defines project workflow and custom fields |
 | Project | Cross-team work items |
 | TaskType | Team-specific task configuration |
-| Task | Work items with display IDs (e.g., CORE-123) |
+| Task | Work items with display IDs (e.g., ORBIT-123) |
 | Release | Version tracking |
 
 **Relationships:**

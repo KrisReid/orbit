@@ -120,7 +120,7 @@ export function Layout() {
               <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center shadow-sm">
                 <span className="text-white font-bold text-sm">PM</span>
               </div>
-              <span className="text-lg font-semibold text-gray-900 dark:text-white">Core PM</span>
+              <span className="text-lg font-semibold text-gray-900 dark:text-white">Orbit</span>
             </Link>
             <button
               className="lg:hidden p-2 -mr-2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"

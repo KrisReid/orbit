@@ -43,21 +43,21 @@ async def seed_database():
         # =================================================================
         print("  Creating users...")
         admin = User(
-            email="admin@corepm.example.com",
+            email="admin@orbit.example.com",
             hashed_password=get_password_hash("admin123"),
             full_name="Admin User",
             role=UserRole.ADMIN,
             is_active=True,
         )
         user1 = User(
-            email="alice@corepm.example.com",
+            email="alice@orbit.example.com",
             hashed_password=get_password_hash("password123"),
             full_name="Alice Engineer",
             role=UserRole.USER,
             is_active=True,
         )
         user2 = User(
-            email="bob@corepm.example.com",
+            email="bob@orbit.example.com",
             hashed_password=get_password_hash("password123"),
             full_name="Bob Developer",
             role=UserRole.USER,
@@ -292,7 +292,7 @@ async def seed_database():
         
         print("✅ Database seeded successfully!")
         print("\n📋 Test credentials:")
-        print("   Email: admin@corepm.example.com")
+        print("   Email: admin@orbit.example.com")
         print("   Password: admin123")
 
 

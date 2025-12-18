@@ -20,7 +20,7 @@ async def login(
     Authenticate user and return access token.
     
     Use these credentials for the seeded test user:
-    - email: admin@corepm.example.com
+    - email: admin@orbit.example.com
     - password: admin123
     """
     try:
