@@ -124,6 +124,14 @@ export function ProjectsPage() {
     setCustomData((prev) => ({ ...prev, [key]: value }));
   };
 
+  // Create a map of project type ID to workflow for quick lookup
+  const projectTypeWorkflows = new Map<number, string[]>();
+  projectTypes?.items?.forEach(pt => {
+    if (pt.workflow) {
+      projectTypeWorkflows.set(pt.id, pt.workflow);
+    }
+  });
+
   // Get unique statuses from project types - collect all statuses from all project type workflows
   const allStatuses: string[] = [];
   const statusSet = new Set<string>();
@@ -184,7 +192,18 @@ export function ProjectsPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (project) => <AutoStatusBadge status={project.status} />,
+      render: (project) => {
+        // Check if this is a final status (last in workflow)
+        // Look up workflow from projectTypes since the list endpoint doesn't include it
+        const workflow = projectTypeWorkflows.get(project.project_type_id) || [];
+        const isFinalStatus = workflow.length > 0 && project.status === workflow[workflow.length - 1];
+        
+        return isFinalStatus ? (
+          <StatusBadge variant="success">{project.status}</StatusBadge>
+        ) : (
+          <AutoStatusBadge status={project.status} />
+        );
+      },
     },
     {
       key: 'updated',
