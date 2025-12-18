@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '@/api/client';
 import type { Project, ProjectType } from '@/types';
-import { FolderKanban, ExternalLink } from 'lucide-react';
+import { FolderKanban, ExternalLink, Trash2 } from 'lucide-react';
 import {
   PageHeader,
   PrimaryActionButton,
@@ -22,12 +22,14 @@ import {
 } from '@/components/ui';
 import type { Column, CustomFieldDefinition } from '@/components/ui';
 import { useEntityModal } from '@/hooks';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 export function ProjectsPage() {
   const queryClient = useQueryClient();
   const modal = useEntityModal<Project>();
   const [filterTypes, setFilterTypes] = useState<number[]>([]);
   const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
+  const [deleteProject, setDeleteProject] = useState<Project | null>(null);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -83,6 +85,15 @@ export function ProjectsPage() {
       queryClient.invalidateQueries({ queryKey: ['themes'] });
       modal.close();
       resetForm();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.projects.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['themes'] });
+      setDeleteProject(null);
     },
   });
 
@@ -193,6 +204,16 @@ export function ProjectsPage() {
           >
             <ExternalLink className="h-5 w-5" />
           </Link>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteProject(project);
+            }}
+            className="text-red-400 hover:text-red-600 dark:hover:text-red-300"
+            title="Delete project"
+          >
+            <Trash2 className="h-5 w-5" />
+          </button>
         </TableActionsCell>
       ),
     },
@@ -252,6 +273,18 @@ export function ProjectsPage() {
           title: 'No projects',
           description: 'Get started by creating a new project.',
         }}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!deleteProject}
+        onClose={() => setDeleteProject(null)}
+        onConfirm={() => deleteProject && deleteMutation.mutate(deleteProject.id)}
+        title="Delete Project"
+        message={`Are you sure you want to delete "${deleteProject?.title}"? This action cannot be undone.`}
+        confirmText="Delete"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
       />
 
       {/* Create Modal */}
