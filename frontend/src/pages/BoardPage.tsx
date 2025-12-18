@@ -68,7 +68,7 @@ export function BoardPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { status: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { status: string; task_type_id?: number } }) =>
       api.tasks.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -102,16 +102,25 @@ export function BoardPage() {
 
   const handleDragStart = (e: React.DragEvent, task: Task) => {
     e.dataTransfer.setData('taskId', String(task.id));
+    e.dataTransfer.setData('taskTypeId', String(task.task_type_id));
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
 
-  const handleDrop = (e: React.DragEvent, status: string) => {
+  const handleDrop = (e: React.DragEvent, status: string, targetTaskTypeId: number) => {
     e.preventDefault();
     const taskId = Number(e.dataTransfer.getData('taskId'));
-    updateMutation.mutate({ id: taskId, data: { status } });
+    const sourceTaskTypeId = Number(e.dataTransfer.getData('taskTypeId'));
+    
+    // Build update data - always update status, only update task_type_id if it changed
+    const data: { status: string; task_type_id?: number } = { status };
+    if (sourceTaskTypeId !== targetTaskTypeId) {
+      data.task_type_id = targetTaskTypeId;
+    }
+    
+    updateMutation.mutate({ id: taskId, data });
   };
 
   if (!selectedTeam) {
@@ -260,7 +269,7 @@ export function BoardPage() {
                   key={status}
                   className="flex-shrink-0 w-72 flex"
                   onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, status)}
+                  onDrop={(e) => handleDrop(e, status, taskType.id)}
                 >
                   <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-4 flex-1 flex flex-col">
                     <div className="flex items-center justify-between mb-4">
