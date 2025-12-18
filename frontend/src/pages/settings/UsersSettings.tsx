@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, UserX, UserCheck } from 'lucide-react';
 
 export function UsersSettings() {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [userToDelete, setUserToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [userToToggle, setUserToToggle] = useState<{ id: number; name: string; isActive: boolean } | null>(null);
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
@@ -26,6 +27,15 @@ export function UsersSettings() {
     mutationFn: api.users.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
+      api.users.update(id, { is_active }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setUserToToggle(null);
     },
   });
 
@@ -81,12 +91,30 @@ export function UsersSettings() {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right">
-                  <button
-                    onClick={() => setUserToDelete({ id: user.id, name: user.full_name })}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => setUserToToggle({
+                        id: user.id,
+                        name: user.full_name,
+                        isActive: user.is_active
+                      })}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        user.is_active
+                          ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                          : 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20'
+                      }`}
+                      title={user.is_active ? 'Deactivate user' : 'Activate user'}
+                    >
+                      {user.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={() => setUserToDelete({ id: user.id, name: user.full_name })}
+                      className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                      title="Delete user"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -116,6 +144,27 @@ export function UsersSettings() {
         confirmText="Delete"
         variant="danger"
         isLoading={deleteMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={!!userToToggle}
+        onClose={() => setUserToToggle(null)}
+        onConfirm={() => {
+          if (userToToggle) {
+            toggleActiveMutation.mutate({
+              id: userToToggle.id,
+              is_active: !userToToggle.isActive
+            });
+          }
+        }}
+        title={userToToggle?.isActive ? 'Deactivate User' : 'Activate User'}
+        message={userToToggle?.isActive
+          ? `Are you sure you want to deactivate "${userToToggle?.name}"? They will no longer be able to log in.`
+          : `Are you sure you want to activate "${userToToggle?.name}"? They will be able to log in again.`
+        }
+        confirmText={userToToggle?.isActive ? 'Deactivate' : 'Activate'}
+        variant={userToToggle?.isActive ? 'danger' : 'info'}
+        isLoading={toggleActiveMutation.isPending}
       />
     </div>
   );
