@@ -344,10 +344,8 @@ class ApiClient {
       return response.data;
     },
 
-    addDependency: async (projectId: number, dependsOnId: number): Promise<MessageResponse> => {
-      const response = await this.client.post<MessageResponse>(`/projects/${projectId}/dependencies`, {
-        depends_on_id: dependsOnId,
-      });
+    addDependency: async (projectId: number, dependsOnId: number): Promise<Project> => {
+      const response = await this.client.post<Project>(`/projects/${projectId}/dependencies/${dependsOnId}`);
       return response.data;
     },
 

@@ -105,6 +105,7 @@ export interface Project {
     fields?: ProjectTypeField[];
   };
   dependencies?: Array<{ id: number; title: string; status: string }>;
+  dependents?: Array<{ id: number; title: string; status: string }>;
   tasks?: Array<{ id: number; display_id: string; title: string; status: string }>;
 }
 

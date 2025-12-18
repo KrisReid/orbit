@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
-import type { ProjectTypeField, Task, TaskType } from '@/types';
-import { ExternalLink, ChevronDown, Plus, Trash2, Link as LinkIcon, CheckSquare } from 'lucide-react';
+import type { ProjectTypeField, Task, TaskType, Project } from '@/types';
+import { ExternalLink, ChevronDown, Plus, Trash2, Link as LinkIcon, CheckSquare, FolderKanban, X, ArrowRight, ArrowLeft } from 'lucide-react';
 import { TaskEditModal } from '@/components/TaskEditModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import {
@@ -34,6 +34,7 @@ export function ProjectDetailPage() {
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [showLinkTaskModal, setShowLinkTaskModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAddDependencyModal, setShowAddDependencyModal] = useState(false);
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -63,6 +64,12 @@ export function ProjectDetailPage() {
   const { data: allTasks, isLoading: tasksLoading } = useQuery({
     queryKey: ['allTasksForLinking'],
     queryFn: () => api.tasks.list({ page_size: 100 }),
+  });
+
+  // Fetch all projects for dependency selection
+  const { data: allProjects } = useQuery({
+    queryKey: ['allProjectsForDependencies'],
+    queryFn: () => api.projects.list({ page_size: 100 }),
   });
 
   // Fetch teams for task modal
@@ -99,6 +106,26 @@ export function ProjectDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['themes'] });
       navigate('/projects');
+    },
+  });
+
+  // Add dependency mutation
+  const addDependencyMutation = useMutation({
+    mutationFn: (dependsOnId: number) => api.projects.addDependency(Number(id!), dependsOnId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['allProjectsForDependencies'] });
+    },
+  });
+
+  // Remove dependency mutation
+  const removeDependencyMutation = useMutation({
+    mutationFn: (dependsOnId: number) => api.projects.removeDependency(Number(id!), dependsOnId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['allProjectsForDependencies'] });
     },
   });
 
@@ -273,34 +300,96 @@ export function ProjectDetailPage() {
       )}
 
       {/* Dependencies */}
-      <ContentCard title="Sequencing & Dependencies">
-        {project.dependencies && project.dependencies.length > 0 ? (
-          <div className="space-y-2 mb-4">
-            {project.dependencies.map((dep) => (
-              <div
-                key={dep.id}
-                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-              >
-                <Link
-                  to={`/projects/${dep.id}`}
-                  className="text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400"
-                >
-                  <div>
-                    <p className="font-medium">{dep.title}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{dep.status}</p>
+      <ContentCard
+        title="Sequencing & Dependencies"
+        headerAction={
+          <button
+            onClick={() => setShowAddDependencyModal(true)}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Dependency
+          </button>
+        }
+      >
+        <div className="space-y-6">
+          {/* This project depends on (is impacted by) */}
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+              <ArrowRight className="h-4 w-4" />
+              Depends On <span className="text-gray-500 font-normal">(is impacted by)</span>
+            </h4>
+            {project.dependencies && project.dependencies.length > 0 ? (
+              <div className="space-y-2">
+                {project.dependencies.map((dep) => (
+                  <div
+                    key={dep.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg group"
+                  >
+                    <Link
+                      to={`/projects/${dep.id}`}
+                      className="flex items-center gap-3 text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400"
+                    >
+                      <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                        <FolderKanban className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{dep.title}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{dep.status}</p>
+                      </div>
+                    </Link>
+                    <button
+                      onClick={() => removeDependencyMutation.mutate(dep.id)}
+                      className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove dependency"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                </Link>
+                ))}
               </div>
-            ))}
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                This project has no dependencies
+              </p>
+            )}
           </div>
-        ) : (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            No dependencies defined
-          </p>
-        )}
-        <button className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium">
-          + Add dependency
-        </button>
+
+          {/* Projects that depend on this one (impacts) */}
+          <div>
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Depended By <span className="text-gray-500 font-normal">(impacts)</span>
+            </h4>
+            {project.dependents && project.dependents.length > 0 ? (
+              <div className="space-y-2">
+                {project.dependents.map((dep) => (
+                  <div
+                    key={dep.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
+                  >
+                    <Link
+                      to={`/projects/${dep.id}`}
+                      className="flex items-center gap-3 text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400"
+                    >
+                      <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-lg">
+                        <FolderKanban className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{dep.title}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{dep.status}</p>
+                      </div>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                No projects depend on this one
+              </p>
+            )}
+          </div>
+        </div>
       </ContentCard>
 
       {/* Linked Tasks */}
@@ -448,6 +537,73 @@ export function ProjectDetailPage() {
           setShowCreateTaskModal(false);
         }}
       />
+
+      {/* Add Dependency Modal */}
+      <FormModal
+        isOpen={showAddDependencyModal}
+        onClose={() => setShowAddDependencyModal(false)}
+        onSubmit={() => {}}
+        title="Add Project Dependency"
+        submitLabel=""
+        cancelLabel="Close"
+        size="lg"
+      >
+        {(() => {
+          // Filter out current project and already-linked dependencies
+          const existingDependencyIds = new Set([
+            ...(project.dependencies?.map(d => d.id) || []),
+            Number(id), // exclude current project
+          ]);
+          const availableProjects = allProjects?.items?.filter(p => !existingDependencyIds.has(p.id)) || [];
+          
+          if (availableProjects.length === 0) {
+            return (
+              <EmptyState
+                icon={FolderKanban}
+                title="No available projects"
+                description="All projects are already dependencies or there are no other projects."
+              />
+            );
+          }
+          
+          return (
+            <div className="space-y-4">
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Adding a dependency means:</strong> This project is <em>impacted by</em> the selected project.
+                  The selected project should ideally be completed before this one.
+                </p>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Select a project that this project depends on:
+              </p>
+              {availableProjects.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    addDependencyMutation.mutate(p.id);
+                    setShowAddDependencyModal(false);
+                  }}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-left transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                      <FolderKanban className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">{p.title}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {p.project_type?.name} • {p.status}
+                      </p>
+                    </div>
+                  </div>
+                  <Plus className="h-4 w-4 text-primary-600" />
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+      </FormModal>
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal

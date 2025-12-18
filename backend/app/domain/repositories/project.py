@@ -230,6 +230,7 @@ class ProjectRepository(BaseRepository[Project]):
             depends_on = await self.get_by_id(depends_on_id)
             if depends_on and depends_on not in project.dependencies:
                 project.dependencies.append(depends_on)
+                self.session.add(project)  # Explicitly mark as modified
                 await self.session.flush()
     
     async def remove_dependency(self, project_id: int, depends_on_id: int) -> None:
