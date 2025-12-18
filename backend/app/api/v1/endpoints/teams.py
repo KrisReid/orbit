@@ -49,6 +49,7 @@ async def create_team(
             name=data.name,
             description=data.description,
             slug=data.slug,
+            color=data.color,
         )
         return team
     except EntityAlreadyExistsError as e:
@@ -98,6 +99,7 @@ async def update_team(
             name=data.name,
             description=data.description,
             slug=data.slug,
+            color=data.color,
         )
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

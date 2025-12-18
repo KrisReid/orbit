@@ -15,6 +15,7 @@ interface Team {
   name: string;
   slug: string;
   description?: string | null;
+  color?: string | null;
 }
 
 interface TeamStats {
@@ -37,16 +38,19 @@ export function TeamsSettings() {
   const [createName, setCreateName] = useState('');
   const [createSlug, setCreateSlug] = useState('');
   const [createDescription, setCreateDescription] = useState('');
+  const [createColor, setCreateColor] = useState('#3B82F6');
 
   // Edit form state
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editColor, setEditColor] = useState('#3B82F6');
 
   // Sync edit form when editingTeam changes
   useEffect(() => {
     if (editingTeam) {
       setEditName(editingTeam.name);
       setEditDescription(editingTeam.description || '');
+      setEditColor(editingTeam.color || '#3B82F6');
     }
   }, [editingTeam]);
 
@@ -64,7 +68,7 @@ export function TeamsSettings() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<{ name: string; description: string }> }) =>
+    mutationFn: ({ id, data }: { id: number; data: Partial<{ name: string; description: string; color: string }> }) =>
       api.teams.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
@@ -87,6 +91,7 @@ export function TeamsSettings() {
     setCreateName('');
     setCreateSlug('');
     setCreateDescription('');
+    setCreateColor('#3B82F6');
   };
 
   const handleCreateSubmit = () => {
@@ -94,6 +99,7 @@ export function TeamsSettings() {
       name: createName,
       slug: createSlug,
       description: createDescription || undefined,
+      color: createColor || undefined,
     });
   };
 
@@ -110,6 +116,7 @@ export function TeamsSettings() {
       data: {
         name: editName,
         description: editDescription || undefined,
+        color: editColor || undefined,
       },
     });
   };
@@ -166,9 +173,15 @@ export function TeamsSettings() {
             className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4"
           >
             <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium text-gray-900 dark:text-white">{team.name}</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">@{team.slug}</p>
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-4 h-4 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: team.color || '#9CA3AF' }}
+                />
+                <div>
+                  <h3 className="font-medium text-gray-900 dark:text-white">{team.name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">@{team.slug}</p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -227,6 +240,27 @@ export function TeamsSettings() {
             rows={2}
             placeholder="Team description..."
           />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Team Color
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={createColor}
+                onChange={(e) => setCreateColor(e.target.value)}
+                className="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer bg-transparent p-1"
+              />
+              <input
+                type="text"
+                value={createColor}
+                onChange={(e) => setCreateColor(e.target.value)}
+                pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono"
+                placeholder="#3B82F6"
+              />
+            </div>
+          </div>
         </div>
       </FormModal>
 
@@ -263,6 +297,27 @@ export function TeamsSettings() {
             onChange={(e) => setEditDescription(e.target.value)}
             rows={2}
           />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Team Color
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={editColor}
+                onChange={(e) => setEditColor(e.target.value)}
+                className="w-10 h-10 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer bg-transparent p-1"
+              />
+              <input
+                type="text"
+                value={editColor}
+                onChange={(e) => setEditColor(e.target.value)}
+                pattern="^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-mono"
+                placeholder="#3B82F6"
+              />
+            </div>
+          </div>
         </div>
       </EditFormModal>
 

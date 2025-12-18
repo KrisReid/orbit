@@ -31,6 +31,7 @@ class TeamService:
         name: str,
         description: str | None = None,
         slug: str | None = None,
+        color: str | None = None,
     ) -> Team:
         """
         Create a new team.
@@ -39,6 +40,7 @@ class TeamService:
             name: Team name
             description: Optional team description
             slug: Optional custom slug (auto-generated if not provided)
+            color: Optional team color (hex code)
             
         Returns:
             Created team with loaded relationships
@@ -56,6 +58,7 @@ class TeamService:
             name=name,
             slug=slug,
             description=description,
+            color=color,
         )
         
         # Return team with loaded relationships for proper serialization
@@ -86,6 +89,7 @@ class TeamService:
         name: str | None = None,
         description: str | None = None,
         slug: str | None = None,
+        color: str | None = None,
     ) -> Team:
         """Update a team."""
         team = await self.get_team(team_id)
@@ -101,6 +105,8 @@ class TeamService:
             updates["description"] = description
         if slug is not None:
             updates["slug"] = slug
+        if color is not None:
+            updates["color"] = color
         
         if updates:
             await self.team_repo.update(team, **updates)

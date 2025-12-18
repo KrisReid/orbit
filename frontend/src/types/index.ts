@@ -27,6 +27,7 @@ export interface Team {
   name: string;
   slug: string;
   description: string | null;
+  color: string | null;
   created_at: string;
   updated_at: string;
 }

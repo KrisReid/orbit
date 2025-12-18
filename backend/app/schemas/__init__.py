@@ -320,6 +320,7 @@ class TeamSummary(BaseModel):
     id: int
     name: str
     slug: str
+    color: str | None = None
 
 class TaskTypeSummary(BaseModel):
     """Summary of a task type for task responses."""
@@ -372,11 +373,13 @@ class TeamCreate(BaseModel):
     name: str
     description: str | None = None
     slug: str | None = None
+    color: str | None = None
 
 class TeamUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     slug: str | None = None
+    color: str | None = None
 
 class TeamResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -384,6 +387,7 @@ class TeamResponse(BaseModel):
     name: str
     slug: str
     description: str | None = None
+    color: str | None = None
     created_at: datetime
     updated_at: datetime
     memberships: list[TeamMemberResponse] = []
