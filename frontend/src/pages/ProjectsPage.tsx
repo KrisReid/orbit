@@ -30,6 +30,7 @@ export function ProjectsPage() {
   const [filterTypes, setFilterTypes] = useState<number[]>([]);
   const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
   const [deleteProject, setDeleteProject] = useState<Project | null>(null);
+  const [targetProjectId, setTargetProjectId] = useState<number | 'none'>('none');
 
   // Form state
   const [title, setTitle] = useState('');
@@ -66,6 +67,13 @@ export function ProjectsPage() {
     enabled: !!projectTypeId,
   });
 
+  // Fetch task count when a project is selected for deletion
+  const { data: taskCountData } = useQuery({
+    queryKey: ['projectTaskCount', deleteProject?.id],
+    queryFn: () => deleteProject ? api.projects.getTaskCount(deleteProject.id) : null,
+    enabled: !!deleteProject,
+  });
+
   // Set initial project type when data loads
   useEffect(() => {
     if (projectTypes?.items?.length && !projectTypeId) {
@@ -92,11 +100,14 @@ export function ProjectsPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => api.projects.delete(id),
+    mutationFn: ({ id, targetProjectId }: { id: number; targetProjectId?: number }) =>
+      api.projects.delete(id, targetProjectId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['themes'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       setDeleteProject(null);
+      setTargetProjectId('none');
     },
   });
 
@@ -342,14 +353,43 @@ export function ProjectsPage() {
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={!!deleteProject}
-        onClose={() => setDeleteProject(null)}
-        onConfirm={() => deleteProject && deleteMutation.mutate(deleteProject.id)}
+        onClose={() => {
+          setDeleteProject(null);
+          setTargetProjectId('none');
+        }}
+        onConfirm={() => deleteProject && deleteMutation.mutate({
+          id: deleteProject.id,
+          targetProjectId: targetProjectId === 'none' ? undefined : targetProjectId,
+        })}
         title="Delete Project"
-        message={`Are you sure you want to delete "${deleteProject?.title}"? This action cannot be undone.`}
+        message={
+          taskCountData?.count && taskCountData.count > 0
+            ? `This project has ${taskCountData.count} task${taskCountData.count > 1 ? 's' : ''} associated with it. What would you like to do with ${taskCountData.count > 1 ? 'them' : 'it'}?`
+            : `Are you sure you want to delete "${deleteProject?.title}"? This action cannot be undone.`
+        }
         confirmText="Delete"
         variant="danger"
         isLoading={deleteMutation.isPending}
-      />
+      >
+        {taskCountData?.count && taskCountData.count > 0 && (
+          <div className="mt-4">
+            <SelectInput
+              label="Task handling"
+              value={targetProjectId}
+              onChange={(e) => setTargetProjectId(e.target.value === 'none' ? 'none' : Number(e.target.value))}
+              options={[
+                { value: 'none', label: 'Remove project association from tasks' },
+                ...(projects?.items || [])
+                  .filter(p => p.id !== deleteProject?.id)
+                  .map(p => ({
+                    value: p.id,
+                    label: `Move tasks to: ${p.title}`,
+                  })),
+              ]}
+            />
+          </div>
+        )}
+      </ConfirmModal>
 
       {/* Create Modal */}
       <FormModal

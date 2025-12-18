@@ -124,19 +124,44 @@ async def update_project(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
+@router.get("/{project_id}/task-count", response_model=dict)
+async def get_project_task_count(
+    project_id: int,
+    db: DbSession,
+    _: CurrentUser,
+):
+    """Get the count of tasks associated with a project."""
+    try:
+        service = ProjectService(db)
+        # Verify project exists
+        await service.get_project(project_id)
+        count = await service.get_task_count(project_id)
+        return {"count": count}
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
 @router.delete("/{project_id}", response_model=MessageResponse)
 async def delete_project(
     project_id: int,
     db: DbSession,
     _: CurrentAdmin,
+    target_project_id: int | None = Query(None, description="Project ID to move tasks to. If not provided, tasks will be disassociated."),
 ):
-    """Delete a project. Admin only."""
+    """Delete a project. Admin only.
+    
+    Tasks associated with this project can be:
+    - Moved to another project (if target_project_id is provided)
+    - Disassociated from any project (if target_project_id is not provided)
+    """
     try:
         service = ProjectService(db)
-        await service.delete_project(project_id)
+        await service.delete_project(project_id, target_project_id)
         return MessageResponse(message="Project deleted successfully")
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.post("/{project_id}/dependencies/{depends_on_id}", response_model=ProjectDetailResponse)

@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import type { ProjectTypeField, Task, TaskType, Project } from '@/types';
-import { ExternalLink, ChevronDown, Plus, Trash2, Link as LinkIcon, CheckSquare, FolderKanban, X, ArrowRight, ArrowLeft } from 'lucide-react';
+import { ExternalLink, ChevronDown, Plus, Link as LinkIcon, CheckSquare, FolderKanban, X, ArrowRight, ArrowLeft } from 'lucide-react';
 import { TaskEditModal } from '@/components/TaskEditModal';
-import { ConfirmModal } from '@/components/ConfirmModal';
 import {
   DetailPageLayout,
   ContentCard,
@@ -28,12 +27,10 @@ import {
 
 export function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [showLinkTaskModal, setShowLinkTaskModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAddDependencyModal, setShowAddDependencyModal] = useState(false);
 
   const { data: project, isLoading } = useQuery({
@@ -97,15 +94,6 @@ export function ProjectDetailPage() {
       if (variables.project_type_id) {
         queryClient.invalidateQueries({ queryKey: ['projectType'] });
       }
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: () => api.projects.delete(Number(id!)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['themes'] });
-      navigate('/projects');
     },
   });
 
@@ -263,16 +251,6 @@ export function ProjectDetailPage() {
             />
           </SidebarCard>
 
-          {/* Actions */}
-          <SidebarCard title="Actions">
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 transition-colors"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Project
-            </button>
-          </SidebarCard>
         </>
       }
     >
@@ -605,17 +583,6 @@ export function ProjectDetailPage() {
         })()}
       </FormModal>
 
-      {/* Delete Confirmation Modal */}
-      <ConfirmModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={() => deleteMutation.mutate()}
-        title="Delete Project"
-        message={`Are you sure you want to delete "${project.title}"? This action cannot be undone. Tasks linked to this project will be unlinked but not deleted.`}
-        confirmText="Delete"
-        variant="danger"
-        isLoading={deleteMutation.isPending}
-      />
     </DetailPageLayout>
   );
 }

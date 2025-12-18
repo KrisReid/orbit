@@ -339,8 +339,15 @@ class ApiClient {
       return response.data;
     },
 
-    delete: async (id: number): Promise<MessageResponse> => {
-      const response = await this.client.delete<MessageResponse>(`/projects/${id}`);
+    delete: async (id: number, targetProjectId?: number): Promise<MessageResponse> => {
+      const response = await this.client.delete<MessageResponse>(`/projects/${id}`, {
+        params: targetProjectId !== undefined ? { target_project_id: targetProjectId } : undefined,
+      });
+      return response.data;
+    },
+
+    getTaskCount: async (id: number): Promise<{ count: number }> => {
+      const response = await this.client.get<{ count: number }>(`/projects/${id}/task-count`);
       return response.data;
     },
 

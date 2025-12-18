@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entities import Project, ProjectType, ProjectTypeField
 from app.domain.entities.base import FieldType
 from app.domain.exceptions import EntityNotFoundError, EntityAlreadyExistsError, ValidationError
-from app.domain.repositories import ProjectRepository, ProjectTypeRepository, ThemeRepository
+from app.domain.repositories import ProjectRepository, ProjectTypeRepository, ThemeRepository, TaskRepository
 
 # Helper
 def generate_slug(name: str) -> str:
@@ -202,6 +202,7 @@ class ProjectService:
         self.project_repo = ProjectRepository(session)
         self.project_type_repo = ProjectTypeRepository(session)
         self.theme_repo = ThemeRepository(session)
+        self.task_repo = TaskRepository(session)
     
     async def create_project(self, title: str, project_type_id: int, description: str = None, theme_id: int = None, custom_data: dict[str, Any] = None) -> Project:
         project_type = await self.project_type_repo.get_with_fields(project_type_id)
@@ -286,9 +287,30 @@ class ProjectService:
             project = await self.project_repo.update(project, **updates)
         return await self.project_repo.get_with_relations(project_id)
     
-    async def delete_project(self, project_id: int) -> None:
+    async def delete_project(self, project_id: int, target_project_id: int | None = None) -> None:
+        """
+        Delete a project. Tasks can be:
+        - Moved to another project (if target_project_id is provided)
+        - Disassociated (target_project_id is None) - their project_id becomes NULL
+        """
         project = await self.get_project(project_id)
+        
+        # Validate target project exists if provided
+        if target_project_id is not None:
+            if target_project_id == project_id:
+                raise ValidationError("Cannot move tasks to the same project being deleted")
+            target = await self.project_repo.get_by_id(target_project_id)
+            if not target:
+                raise EntityNotFoundError("Project", target_project_id)
+        
+        # Move tasks to target project or disassociate them
+        await self.task_repo.update_project_for_tasks(project_id, target_project_id)
+        
         await self.project_repo.delete(project)
+    
+    async def get_task_count(self, project_id: int) -> int:
+        """Get the number of tasks associated with a project."""
+        return await self.task_repo.count_filtered(project_id=project_id)
     
     async def add_dependency(self, project_id: int, depends_on_id: int) -> Project:
         await self.get_project(project_id)

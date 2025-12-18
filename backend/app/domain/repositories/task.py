@@ -224,6 +224,19 @@ class TaskRepository(BaseRepository[Task]):
         result = await self.session.execute(query)
         return result.scalar_one()
     
+    async def update_project_for_tasks(self, current_project_id: int, new_project_id: int | None) -> int:
+        """Update project_id for all tasks of a project. Returns count of updated tasks."""
+        from sqlalchemy import update
+        
+        query = (
+            update(Task)
+            .where(Task.project_id == current_project_id)
+            .values(project_id=new_project_id)
+        )
+        result = await self.session.execute(query)
+        await self.session.flush()
+        return result.rowcount
+    
     async def add_dependency(self, task_id: int, depends_on_id: int) -> None:
         """Add a dependency to a task."""
         task = await self.get_by_id(task_id, [Task.dependencies])

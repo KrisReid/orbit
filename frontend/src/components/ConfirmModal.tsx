@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, ReactNode } from 'react';
 import { AlertTriangle, Info, X } from 'lucide-react';
 
 export type ConfirmModalVariant = 'danger' | 'warning' | 'info';
@@ -13,6 +13,7 @@ export interface ConfirmModalProps {
   cancelText?: string;
   variant?: ConfirmModalVariant;
   isLoading?: boolean;
+  children?: ReactNode;
 }
 
 const variantConfig = {
@@ -49,6 +50,7 @@ export function ConfirmModal({
   cancelText = 'Cancel',
   variant = 'danger',
   isLoading = false,
+  children,
 }: ConfirmModalProps) {
   const config = variantConfig[variant];
   const Icon = config.icon;
@@ -129,6 +131,7 @@ export function ConfirmModal({
                 >
                   {message}
                 </p>
+                {children}
               </div>
             </div>
 
