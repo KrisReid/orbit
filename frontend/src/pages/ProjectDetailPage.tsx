@@ -12,6 +12,7 @@ import {
   SidebarCard,
   InfoList,
   InlineEditableTextarea,
+  InlineEditableTitle,
   WorkflowSelector,
   LinkedTaskRow,
   LinkedItemsList,
@@ -77,7 +78,7 @@ export function ProjectDetailPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { status?: string; description?: string; custom_data?: Record<string, unknown>; theme_id?: number | null; project_type_id?: number }) =>
+    mutationFn: (data: { title?: string; status?: string; description?: string; custom_data?: Record<string, unknown>; theme_id?: number | null; project_type_id?: number }) =>
       api.projects.update(Number(id!), data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['project', id] });
@@ -199,9 +200,13 @@ export function ProjectDetailPage() {
         },
       ]}
       title={
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          {project.title}
-        </h1>
+        <InlineEditableTitle
+          value={project.title}
+          onSave={(title) => updateMutation.mutate({ title })}
+          placeholder="Enter project title..."
+          isLoading={updateMutation.isPending}
+          className="mb-2"
+        />
       }
       sidebar={
         <>
