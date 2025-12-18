@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { FormModal, SelectInput } from '@/components/ui';
+import { StatusTransitionModal } from '@/components/StatusTransitionModal';
 import type { ProjectTypeField, FieldType } from '@/types';
 import { Plus, Pencil, Trash2, GripVertical, ChevronDown, ChevronUp, X } from 'lucide-react';
 
@@ -271,7 +271,7 @@ export function ProjectTypesSettings() {
 
       {/* Status Transition Modal */}
       {transitionModal && (
-        <FormModal
+        <StatusTransitionModal
           isOpen={transitionModal.open}
           onClose={() => setTransitionModal(null)}
           onSubmit={() => {
@@ -283,41 +283,14 @@ export function ProjectTypesSettings() {
               });
             }
           }}
-          title="Remove Status from Workflow"
-          submitLabel="Transition & Remove"
-          loadingLabel="Transitioning..."
           isLoading={transitionStatusMutation.isPending}
-        >
-          <div className="space-y-4">
-            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                The status <strong className="capitalize">"{transitionModal.statusToRemove}"</strong> is currently used by{' '}
-                <strong>{transitionModal.projectCount} project(s)</strong>.
-              </p>
-            </div>
-            
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              To remove this status from the workflow, all projects with this status will be transitioned to another status.
-            </p>
-            
-            <SelectInput
-              label="Transition projects to"
-              value={transitionModal.targetStatus}
-              onChange={(e) => setTransitionModal({ ...transitionModal, targetStatus: e.target.value })}
-              options={transitionModal.availableStatuses.map((s) => ({
-                value: s,
-                label: s.charAt(0).toUpperCase() + s.slice(1),
-              }))}
-            />
-            
-            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                This action will update {transitionModal.projectCount} project(s) to the new status
-                and remove "{transitionModal.statusToRemove}" from the workflow.
-              </p>
-            </div>
-          </div>
-        </FormModal>
+          statusToRemove={transitionModal.statusToRemove}
+          itemCount={transitionModal.projectCount}
+          availableStatuses={transitionModal.availableStatuses}
+          targetStatus={transitionModal.targetStatus}
+          onTargetStatusChange={(status) => setTransitionModal({ ...transitionModal, targetStatus: status })}
+          entityType="project"
+        />
       )}
 
       {deleteType && typeStats && (

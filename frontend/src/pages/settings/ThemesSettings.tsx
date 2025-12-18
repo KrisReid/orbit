@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
-import { FormModal, SelectInput } from '@/components/ui';
+import { StatusTransitionModal } from '@/components/StatusTransitionModal';
 
 const THEME_STATUSES_STORAGE_KEY = 'theme_workflow_statuses';
 const DEFAULT_THEME_STATUSES = ['active', 'completed', 'archived'];
@@ -293,44 +293,18 @@ export function ThemesSettings() {
       </div>
 
       {/* Status Transition Modal */}
-      <FormModal
+      <StatusTransitionModal
         isOpen={transitionModal.open}
         onClose={handleCloseTransitionModal}
         onSubmit={handleConfirmTransition}
-        title="Remove Status"
-        submitLabel="Remove & Transition"
-        loadingLabel="Transitioning..."
         isLoading={transitionMutation.isPending}
-      >
-        <div className="space-y-4">
-          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-            <p className="text-sm text-amber-800 dark:text-amber-200">
-              The status <strong className="capitalize">"{transitionModal.statusToRemove}"</strong> is currently used by{' '}
-              <strong>{statusUsage[transitionModal.statusToRemove] || 0} theme(s)</strong>.
-            </p>
-          </div>
-          
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            To remove this status, all themes with this status will be transitioned to another status.
-          </p>
-          
-          <SelectInput
-            label="Transition themes to"
-            value={transitionModal.targetStatus}
-            onChange={(e) => setTransitionModal({ ...transitionModal, targetStatus: e.target.value })}
-            options={statuses
-              .filter((s) => s !== transitionModal.statusToRemove)
-              .map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }))}
-          />
-          
-          <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              This action will update {statusUsage[transitionModal.statusToRemove] || 0} theme(s) to the new status
-              and remove "{transitionModal.statusToRemove}" from the workflow.
-            </p>
-          </div>
-        </div>
-      </FormModal>
+        statusToRemove={transitionModal.statusToRemove}
+        itemCount={statusUsage[transitionModal.statusToRemove] || 0}
+        availableStatuses={statuses.filter((s) => s !== transitionModal.statusToRemove)}
+        targetStatus={transitionModal.targetStatus}
+        onTargetStatusChange={(status) => setTransitionModal({ ...transitionModal, targetStatus: status })}
+        entityType="theme"
+      />
     </div>
   );
 }
