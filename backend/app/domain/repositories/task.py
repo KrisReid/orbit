@@ -131,6 +131,7 @@ class TaskRepository(BaseRepository[Task]):
                 selectinload(Task.release),
                 selectinload(Task.github_links),
                 selectinload(Task.dependencies),
+                selectinload(Task.dependents),
             )
         )
         result = await self.session.execute(query)
@@ -148,6 +149,7 @@ class TaskRepository(BaseRepository[Task]):
                 selectinload(Task.release),
                 selectinload(Task.github_links),
                 selectinload(Task.dependencies),
+                selectinload(Task.dependents),
             )
         )
         result = await self.session.execute(query)
@@ -173,6 +175,7 @@ class TaskRepository(BaseRepository[Task]):
                 selectinload(Task.release),
                 selectinload(Task.github_links),
                 selectinload(Task.dependencies),
+                selectinload(Task.dependents),
             )
         )
         

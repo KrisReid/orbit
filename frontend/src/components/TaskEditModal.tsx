@@ -2,12 +2,14 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import type { Task, TaskType, TaskTypeField, Team, Project } from '@/types';
-import { GitBranch, ChevronDown, X, ArrowDown, ArrowUp } from 'lucide-react';
-import { 
-  WorkflowSelector, 
-  DynamicField, 
+import { GitBranch, ChevronDown, X, ArrowRight, ArrowLeft, Plus, CheckSquare } from 'lucide-react';
+import {
+  WorkflowSelector,
+  DynamicField,
   SelectInput,
   SimpleSelector,
+  FormModal,
+  EmptyState,
 } from './ui';
 import { useClickOutside, useDropdownClose } from '@/hooks';
 
@@ -51,6 +53,12 @@ export function TaskEditModal({
     queryFn: () => api.releases.list(),
   });
 
+  // Fetch all tasks (across all teams) for dependency selection
+  const { data: allTasksData } = useQuery({
+    queryKey: ['allTasksForDependencies'],
+    queryFn: () => api.tasks.list({ page_size: 500 }),
+  });
+
   // Form state
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description || '');
@@ -62,20 +70,18 @@ export function TaskEditModal({
   const [taskTypeId, setTaskTypeId] = useState(task.task_type_id);
   const [customData, setCustomData] = useState<Record<string, unknown>>(task.custom_data || {});
   
-  // Dropdown states
+  // Dropdown and modal states
   const [showTeamDropdown, setShowTeamDropdown] = useState(false);
   const [showTaskTypeDropdown, setShowTaskTypeDropdown] = useState(false);
-  const [showDependencyDropdown, setShowDependencyDropdown] = useState(false);
+  const [showAddDependencyModal, setShowAddDependencyModal] = useState(false);
 
   const teamDropdownRef = useRef<HTMLDivElement>(null);
   const taskTypeDropdownRef = useRef<HTMLDivElement>(null);
-  const dependencyDropdownRef = useRef<HTMLDivElement>(null);
 
   // Use click outside hook for dropdowns
   useDropdownClose([
     { ref: teamDropdownRef, isOpen: showTeamDropdown, close: () => setShowTeamDropdown(false) },
     { ref: taskTypeDropdownRef, isOpen: showTaskTypeDropdown, close: () => setShowTaskTypeDropdown(false) },
-    { ref: dependencyDropdownRef, isOpen: showDependencyDropdown, close: () => setShowDependencyDropdown(false) },
   ]);
 
   // Get current workflow based on selected task type
@@ -114,15 +120,23 @@ export function TaskEditModal({
   // Dependency mutations
   const addDependencyMutation = useMutation({
     mutationFn: (dependsOnId: number) => api.addTaskDependency(task.id, dependsOnId),
-    onSuccess: () => {
+    onSuccess: (_, dependsOnId) => {
+      // Invalidate current task, the other task, and all task lists for refresh
       queryClient.invalidateQueries({ queryKey: ['task', task.id] });
+      queryClient.invalidateQueries({ queryKey: ['task', dependsOnId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['allTasksForDependencies'] });
     },
   });
 
   const removeDependencyMutation = useMutation({
     mutationFn: (dependsOnId: number) => api.removeTaskDependency(task.id, dependsOnId),
-    onSuccess: () => {
+    onSuccess: (_, dependsOnId) => {
+      // Invalidate current task, the other task, and all task lists for refresh
       queryClient.invalidateQueries({ queryKey: ['task', task.id] });
+      queryClient.invalidateQueries({ queryKey: ['task', dependsOnId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['allTasksForDependencies'] });
     },
   });
 
@@ -137,20 +151,15 @@ export function TaskEditModal({
   };
 
   // Available tasks for dependencies (exclude self and already added)
-  type TaskWithDependencies = Task & { dependencies?: Array<{ id: number }> };
-  const existingDependencyIds = (fullTask as TaskWithDependencies)?.dependencies?.map(d => d.id) || [];
-  const availableTasksForDependency = allTasks.filter(
+  // Use allTasksData to allow dependencies across teams
+  const existingDependencyIds = fullTask?.dependencies?.map(d => d.id) || [];
+  const allAvailableTasks = allTasksData?.items || allTasks; // Fallback to passed allTasks if fetch fails
+  const availableTasksForDependency = allAvailableTasks.filter(
     t => t.id !== task.id && !existingDependencyIds.includes(t.id)
   );
 
   const selectedTeam = teams.find(t => t.id === teamId);
   const selectedTaskType = taskTypes.find(tt => tt.id === taskTypeId);
-
-  // Type for task with full dependency info
-  type TaskWithFullDependencies = Task & { 
-    dependencies?: Array<{ id: number; display_id: string; title: string; status: string }>;
-    dependents?: Array<{ id: number; display_id: string; title: string; status: string }>;
-  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -447,93 +456,154 @@ export function TaskEditModal({
                   )}
                 </div>
 
-                {/* Dependencies - Add Blocker */}
+                {/* Dependencies Section Header */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                    Dependencies
-                  </label>
-                  <div className="relative" ref={dependencyDropdownRef}>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Dependencies
+                    </label>
                     <button
-                      onClick={() => setShowDependencyDropdown(!showDependencyDropdown)}
-                      className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm hover:border-gray-400"
+                      onClick={() => setShowAddDependencyModal(true)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
                     >
-                      <span>+ Add Blocker</span>
-                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                      <Plus className="h-3 w-3" />
+                      Add
                     </button>
-                    {showDependencyDropdown && availableTasksForDependency.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
-                        {availableTasksForDependency.map(t => (
-                          <button
-                            key={t.id}
-                            onClick={() => {
-                              addDependencyMutation.mutate(t.id);
-                              setShowDependencyDropdown(false);
-                            }}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 flex items-center gap-2"
-                          >
-                            <span className="font-mono text-xs text-gray-400">{t.display_id}</span>
-                            <span className="truncate">{t.title}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  </div>
+
+                  {/* Depends On (is impacted by) */}
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-1">
+                        <ArrowRight className="h-3 w-3" />
+                        Depends On <span className="text-gray-400 font-normal">(is impacted by)</span>
+                      </h4>
+                      {fullTask?.dependencies && fullTask.dependencies.length > 0 ? (
+                        <div className="space-y-1">
+                          {fullTask.dependencies.map((dep) => (
+                            <div
+                              key={dep.id}
+                              className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg group"
+                            >
+                              <div className="flex items-center gap-2 text-sm min-w-0">
+                                <div className="bg-blue-100 dark:bg-blue-900/30 p-1.5 rounded flex-shrink-0">
+                                  <CheckSquare className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <span className="font-mono text-xs text-primary-600 dark:text-primary-400">{dep.display_id}</span>
+                                <span className="truncate text-gray-700 dark:text-gray-300">{dep.title}</span>
+                              </div>
+                              <button
+                                onClick={() => removeDependencyMutation.mutate(dep.id)}
+                                className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                                title="Remove dependency"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                          No dependencies
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Depended By (impacts) */}
+                    <div>
+                      <h4 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-1">
+                        <ArrowLeft className="h-3 w-3" />
+                        Depended By <span className="text-gray-400 font-normal">(impacts)</span>
+                      </h4>
+                      {fullTask?.dependents && fullTask.dependents.length > 0 ? (
+                        <div className="space-y-1">
+                          {fullTask.dependents.map((dep) => (
+                            <div
+                              key={dep.id}
+                              className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg text-sm"
+                            >
+                              <div className="bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded flex-shrink-0">
+                                <CheckSquare className="h-3 w-3 text-purple-600 dark:text-purple-400" />
+                              </div>
+                              <span className="font-mono text-xs text-primary-600 dark:text-primary-400">{dep.display_id}</span>
+                              <span className="truncate text-gray-700 dark:text-gray-300">{dep.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                          No tasks depend on this
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {/* Blocked By */}
-                {(fullTask as TaskWithFullDependencies)?.dependencies &&
-                 (fullTask as TaskWithFullDependencies).dependencies!.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                      Blocked By
-                    </label>
-                    <div className="space-y-2">
-                      {(fullTask as TaskWithFullDependencies).dependencies!.map((dep) => (
-                        <div
-                          key={dep.id}
-                          className="flex items-center justify-between p-2.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg"
-                        >
-                          <div className="flex items-center gap-2 text-sm">
-                            <ArrowDown className="h-4 w-4" />
-                            <span className="font-mono">{dep.display_id}</span>
-                          </div>
-                          <button
-                            onClick={() => removeDependencyMutation.mutate(dep.id)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Blocks */}
-                {(fullTask as TaskWithFullDependencies)?.dependents &&
-                 (fullTask as TaskWithFullDependencies).dependents!.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                      Blocks
-                    </label>
-                    <div className="space-y-2">
-                      {(fullTask as TaskWithFullDependencies).dependents!.map((dep) => (
-                        <div
-                          key={dep.id}
-                          className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 rounded-lg text-sm"
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                          <span className="font-mono">{dep.display_id}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Add Dependency Modal */}
+      <FormModal
+        isOpen={showAddDependencyModal}
+        onClose={() => setShowAddDependencyModal(false)}
+        onSubmit={() => {}}
+        title="Add Task Dependency"
+        submitLabel=""
+        cancelLabel="Close"
+        size="lg"
+      >
+        {availableTasksForDependency.length === 0 ? (
+          <EmptyState
+            icon={CheckSquare}
+            title="No available tasks"
+            description="All tasks are already dependencies or there are no other tasks."
+          />
+        ) : (
+          <div className="space-y-4">
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                <strong>Adding a dependency means:</strong> This task is <em>impacted by</em> the selected task.
+                The selected task should ideally be completed before this one.
+              </p>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Select a task that this task depends on:
+            </p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {availableTasksForDependency.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    addDependencyMutation.mutate(t.id);
+                    setShowAddDependencyModal(false);
+                  }}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-left transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg flex-shrink-0">
+                      <CheckSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 dark:text-white truncate">
+                        <span className="text-gray-500 dark:text-gray-400 mr-2 font-mono text-sm">{t.display_id}</span>
+                        {t.title}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {t.team?.name && <span className="text-primary-600 dark:text-primary-400">{t.team.name}</span>}
+                        {t.team?.name && ' • '}
+                        {t.status}
+                      </p>
+                    </div>
+                  </div>
+                  <Plus className="h-4 w-4 text-primary-600 flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </FormModal>
     </div>
   );
 }

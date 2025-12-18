@@ -472,10 +472,8 @@ class ApiClient {
       return response.data;
     },
 
-    addDependency: async (taskId: number, dependsOnId: number): Promise<MessageResponse> => {
-      const response = await this.client.post<MessageResponse>(`/tasks/${taskId}/dependencies`, {
-        depends_on_id: dependsOnId,
-      });
+    addDependency: async (taskId: number, dependsOnId: number): Promise<Task> => {
+      const response = await this.client.post<Task>(`/tasks/${taskId}/dependencies/${dependsOnId}`);
       return response.data;
     },
 

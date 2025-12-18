@@ -171,6 +171,7 @@ export interface Task {
     status: ReleaseStatus;
   } | null;
   dependencies?: Array<{ id: number; display_id: string; title: string; status: string }>;
+  dependents?: Array<{ id: number; display_id: string; title: string; status: string }>;
   github_links?: GitHubLink[];
 }
 

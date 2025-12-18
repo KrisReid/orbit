@@ -358,6 +358,7 @@ class TaskResponse(BaseModel):
     project: ProjectSummary | None = None
     release: ReleaseSummary | None = None
     dependencies: list[DependencySummary] = []
+    dependents: list[DependencySummary] = []
     github_links: list[GitHubLinkResponse] = []
 
 # --- Team Schemas ---
