@@ -394,8 +394,16 @@ class TeamResponse(BaseModel):
     task_types: list[TaskTypeResponse] = []
 
 class TeamStatsResponse(BaseModel):
-    total_tasks: int
-    tasks_by_status: dict[str, int]
+    team_id: int
+    team_name: str
+    task_count: int
+    task_type_count: int
+    is_unassigned_team: bool
+    tasks_by_status: dict[str, int] = {}
+
+class TeamDeleteRequest(BaseModel):
+    reassign_tasks_to: int | None = None
+    delete_tasks: bool = False
 
 # --- Aliases for Backward Compatibility ---
 # These map the "Response" models to the generic names expected by old endpoints

@@ -32,6 +32,7 @@ export function TeamsSettings() {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [deleteTeam, setDeleteTeam] = useState<Team | null>(null);
   const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
+  const [taskAction, setTaskAction] = useState<'reassign' | 'delete'>('reassign');
   const [reassignTo, setReassignTo] = useState<number | undefined>(undefined);
 
   // Create form state
@@ -77,10 +78,11 @@ export function TeamsSettings() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: ({ id, reassignTasksTo }: { id: number; reassignTasksTo?: number }) =>
-      api.teams.delete(id, reassignTasksTo),
+    mutationFn: ({ id, reassignTasksTo, deleteTasks }: { id: number; reassignTasksTo?: number; deleteTasks?: boolean }) =>
+      api.teams.delete(id, reassignTasksTo, deleteTasks),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
       handleCloseDelete();
     },
   });
@@ -134,15 +136,23 @@ export function TeamsSettings() {
   const handleCloseDelete = () => {
     setDeleteTeam(null);
     setTeamStats(null);
+    setTaskAction('reassign');
     setReassignTo(undefined);
   };
 
   const handleConfirmDelete = () => {
     if (!deleteTeam) return;
-    deleteMutation.mutate({
-      id: deleteTeam.id,
-      reassignTasksTo: reassignTo,
-    });
+    if (taskAction === 'delete') {
+      deleteMutation.mutate({
+        id: deleteTeam.id,
+        deleteTasks: true,
+      });
+    } else {
+      deleteMutation.mutate({
+        id: deleteTeam.id,
+        reassignTasksTo: reassignTo,
+      });
+    }
   };
 
   if (isLoading) {
@@ -340,23 +350,73 @@ export function TeamsSettings() {
             </div>
 
             {teamStats.task_count > 0 && (
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   This team has <strong>{teamStats.task_count} tasks</strong> and{' '}
                   <strong>{teamStats.task_type_count} task types</strong>.
                 </p>
-                <SelectInput
-                  label="Reassign tasks to"
-                  value={reassignTo?.toString() || ''}
-                  onChange={(e) => setReassignTo(e.target.value ? Number(e.target.value) : undefined)}
-                  options={[
-                    { value: '', label: 'Unassigned Team (default)' },
-                    ...otherTeams.map((t) => ({ value: t.id.toString(), label: t.name })),
-                  ]}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Task types will be deleted. Tasks will be migrated to the target team's default task type.
-                </p>
+                
+                {/* Task Action Options */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    What should happen to the tasks?
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="taskAction"
+                        value="reassign"
+                        checked={taskAction === 'reassign'}
+                        onChange={() => setTaskAction('reassign')}
+                        className="text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        Move tasks to another team
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="taskAction"
+                        value="delete"
+                        checked={taskAction === 'delete'}
+                        onChange={() => setTaskAction('delete')}
+                        className="text-red-600 focus:ring-red-500"
+                      />
+                      <span className="text-sm text-red-600 dark:text-red-400">
+                        Delete all tasks permanently
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                
+                {/* Reassignment Target (only shown when reassign is selected) */}
+                {taskAction === 'reassign' && (
+                  <div>
+                    <SelectInput
+                      label="Move tasks to"
+                      value={reassignTo?.toString() || ''}
+                      onChange={(e) => setReassignTo(e.target.value ? Number(e.target.value) : undefined)}
+                      options={[
+                        { value: '', label: 'Unassigned Team (default)' },
+                        ...otherTeams.map((t) => ({ value: t.id.toString(), label: t.name })),
+                      ]}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Task types will be deleted. Tasks will be migrated to the target team's default task type.
+                    </p>
+                  </div>
+                )}
+                
+                {/* Delete Warning */}
+                {taskAction === 'delete' && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p className="text-sm text-red-800 dark:text-red-200">
+                      ⚠️ <strong>Warning:</strong> This will permanently delete all {teamStats.task_count} tasks and cannot be undone.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>

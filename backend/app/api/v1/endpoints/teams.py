@@ -112,14 +112,29 @@ async def delete_team(
     team_id: int,
     db: DbSession,
     _: CurrentAdmin,
+    reassign_tasks_to: int | None = None,
+    delete_tasks: bool = False,
 ):
-    """Delete a team. Admin only."""
+    """
+    Delete a team. Admin only.
+    
+    Args:
+        team_id: ID of the team to delete
+        reassign_tasks_to: Team ID to reassign tasks to (optional)
+        delete_tasks: If True, delete all tasks; otherwise reassign to target team or 'unassigned'
+    """
     try:
         service = TeamService(db)
-        await service.delete_team(team_id)
+        await service.delete_team(
+            team_id=team_id,
+            reassign_tasks_to=reassign_tasks_to,
+            delete_tasks=delete_tasks,
+        )
         return MessageResponse(message="Team deleted successfully")
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("/{team_id}/stats", response_model=TeamStatsResponse)

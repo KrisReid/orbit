@@ -100,13 +100,23 @@ class TeamRepository(BaseRepository[Team]):
         return result.scalar_one_or_none() is not None
     
     async def get_team_stats(self, team_id: int) -> dict:
-        """Get task statistics for a team."""
+        """Get comprehensive task statistics for a team."""
         from app.domain.entities import Task
+        
+        # Get team info
+        team = await self.get_by_id(team_id)
+        if not team:
+            return None
         
         # Count total tasks
         total_query = select(func.count()).select_from(Task).where(Task.team_id == team_id)
         total_result = await self.session.execute(total_query)
-        total = total_result.scalar_one()
+        task_count = total_result.scalar_one()
+        
+        # Count task types
+        type_count_query = select(func.count()).select_from(TaskType).where(TaskType.team_id == team_id)
+        type_count_result = await self.session.execute(type_count_query)
+        task_type_count = type_count_result.scalar_one()
         
         # Count tasks by status
         status_query = (
@@ -118,6 +128,10 @@ class TeamRepository(BaseRepository[Team]):
         by_status = {row[0]: row[1] for row in status_result.all()}
         
         return {
-            "total_tasks": total,
+            "team_id": team_id,
+            "team_name": team.name,
+            "task_count": task_count,
+            "task_type_count": task_type_count,
+            "is_unassigned_team": team.slug == "unassigned",
             "tasks_by_status": by_status,
         }

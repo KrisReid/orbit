@@ -3,8 +3,9 @@ Team service for team management operations.
 """
 import re
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
 
-from app.domain.entities import Team
+from app.domain.entities import Team, Task, TaskType
 from app.domain.exceptions import EntityNotFoundError, EntityAlreadyExistsError, ValidationError
 from app.domain.repositories import TeamRepository, UserRepository
 
@@ -114,10 +115,100 @@ class TeamService:
         # Return team with loaded relationships for proper serialization
         return await self.team_repo.get_with_members(team_id)
     
-    async def delete_team(self, team_id: int) -> None:
-        """Delete a team."""
+    async def delete_team(
+        self,
+        team_id: int,
+        reassign_tasks_to: int | None = None,
+        delete_tasks: bool = False,
+    ) -> None:
+        """
+        Delete a team with options for handling its tasks.
+        
+        Args:
+            team_id: ID of the team to delete
+            reassign_tasks_to: Team ID to reassign tasks to (if provided)
+            delete_tasks: If True, delete all tasks; if False and no reassign_to, tasks go to 'unassigned' team
+        """
         team = await self.get_team(team_id)
+        
+        # Prevent deleting the unassigned team
+        if team.slug == "unassigned":
+            raise ValidationError("Cannot delete the unassigned team")
+        
+        # Handle tasks before deleting team
+        task_count = await self._get_task_count(team_id)
+        
+        if task_count > 0:
+            if delete_tasks:
+                # Delete all tasks in the team
+                await self._delete_team_tasks(team_id)
+            else:
+                # Reassign tasks to another team
+                target_team_id = reassign_tasks_to
+                if not target_team_id:
+                    # Default to unassigned team
+                    unassigned_team = await self.team_repo.get_by_slug("unassigned")
+                    if unassigned_team:
+                        target_team_id = unassigned_team.id
+                    else:
+                        raise ValidationError("No target team specified and unassigned team not found")
+                
+                # Verify target team exists
+                target_team = await self.team_repo.get_with_members(target_team_id)
+                if not target_team:
+                    raise EntityNotFoundError("Team", target_team_id)
+                
+                # Get the default task type from target team
+                target_task_type = await self._get_default_task_type(target_team_id)
+                
+                # Reassign tasks
+                await self._reassign_team_tasks(team_id, target_team_id, target_task_type.id if target_task_type else None)
+        
+        # Delete the team (cascade will delete task types)
         await self.team_repo.delete(team)
+    
+    async def _get_task_count(self, team_id: int) -> int:
+        """Get the number of tasks in a team."""
+        query = select(Task).where(Task.team_id == team_id)
+        result = await self.session.execute(query)
+        return len(result.scalars().all())
+    
+    async def _delete_team_tasks(self, team_id: int) -> None:
+        """Delete all tasks in a team."""
+        stmt = delete(Task).where(Task.team_id == team_id)
+        await self.session.execute(stmt)
+        await self.session.flush()
+    
+    async def _get_default_task_type(self, team_id: int) -> TaskType | None:
+        """Get the first task type for a team (default)."""
+        query = select(TaskType).where(TaskType.team_id == team_id).limit(1)
+        result = await self.session.execute(query)
+        return result.scalar_one_or_none()
+    
+    async def _reassign_team_tasks(
+        self,
+        source_team_id: int,
+        target_team_id: int,
+        target_task_type_id: int | None
+    ) -> None:
+        """Reassign all tasks from one team to another."""
+        # Get all tasks from source team
+        query = select(Task).where(Task.team_id == source_team_id)
+        result = await self.session.execute(query)
+        tasks = result.scalars().all()
+        
+        for task in tasks:
+            task.team_id = target_team_id
+            if target_task_type_id:
+                task.task_type_id = target_task_type_id
+                # Reset status to the first status of the new task type
+                target_type_query = select(TaskType).where(TaskType.id == target_task_type_id)
+                target_type_result = await self.session.execute(target_type_query)
+                target_type = target_type_result.scalar_one_or_none()
+                if target_type and target_type.workflow:
+                    task.status = target_type.workflow[0]
+        
+        await self.session.flush()
     
     async def add_member(self, team_id: int, user_id: int) -> Team:
         """Add a member to a team."""

@@ -143,9 +143,16 @@ class ApiClient {
       return response.data;
     },
 
-    delete: async (id: number, reassignTasksTo?: number): Promise<MessageResponse> => {
+    delete: async (id: number, reassignTasksTo?: number, deleteTasks?: boolean): Promise<MessageResponse> => {
+      const params: Record<string, string | number | boolean> = {};
+      if (reassignTasksTo !== undefined) {
+        params.reassign_tasks_to = reassignTasksTo;
+      }
+      if (deleteTasks !== undefined) {
+        params.delete_tasks = deleteTasks;
+      }
       const response = await this.client.delete<MessageResponse>(`/teams/${id}`, {
-        params: reassignTasksTo ? { reassign_tasks_to: reassignTasksTo } : undefined,
+        params: Object.keys(params).length > 0 ? params : undefined,
       });
       return response.data;
     },
