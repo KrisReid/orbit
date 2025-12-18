@@ -106,3 +106,19 @@ async def delete_theme(
         return MessageResponse(message="Theme deleted successfully")
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/transition-status", response_model=MessageResponse)
+async def transition_theme_status(
+    old_status: str,
+    new_status: str,
+    db: DbSession,
+    _: CurrentAdmin,
+):
+    """
+    Transition all themes from one status to another.
+    Used when deleting a status from the workflow.
+    """
+    service = ThemeService(db)
+    count = await service.transition_status(old_status, new_status)
+    return MessageResponse(message=f"Transitioned {count} theme(s) from '{old_status}' to '{new_status}'")

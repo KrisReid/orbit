@@ -1,6 +1,7 @@
 """
 Theme service for strategic initiative management.
 """
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import Theme
@@ -97,3 +98,29 @@ class ThemeService:
         """Delete a theme."""
         theme = await self.get_theme(theme_id)
         await self.theme_repo.delete(theme)
+    
+    async def transition_status(self, old_status: str, new_status: str) -> int:
+        """
+        Transition all themes from one status to another.
+        
+        Args:
+            old_status: The status to transition from
+            new_status: The status to transition to
+            
+        Returns:
+            Number of themes transitioned
+        """
+        # Normalize to lowercase for case-insensitive matching
+        old_status_lower = old_status.lower()
+        new_status_lower = new_status.lower()
+        
+        # Update all themes with the old status
+        stmt = (
+            update(Theme)
+            .where(Theme.status == old_status_lower)
+            .values(status=new_status_lower)
+        )
+        result = await self.session.execute(stmt)
+        await self.session.flush()
+        
+        return result.rowcount

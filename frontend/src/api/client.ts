@@ -209,6 +209,13 @@ class ApiClient {
       const response = await this.client.delete<MessageResponse>(`/themes/${id}`);
       return response.data;
     },
+
+    transitionStatus: async (oldStatus: string, newStatus: string): Promise<MessageResponse> => {
+      const response = await this.client.post<MessageResponse>('/themes/transition-status', null, {
+        params: { old_status: oldStatus, new_status: newStatus },
+      });
+      return response.data;
+    },
   };
 
   // ============================================

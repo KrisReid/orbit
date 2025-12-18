@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
+import { FormModal, SelectInput } from '@/components/ui';
 
 const THEME_STATUSES_STORAGE_KEY = 'theme_workflow_statuses';
 const DEFAULT_THEME_STATUSES = ['active', 'completed', 'archived'];
 
 export function ThemesSettings() {
+  const queryClient = useQueryClient();
   const [statuses, setStatuses] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(THEME_STATUSES_STORAGE_KEY);
@@ -20,6 +22,19 @@ export function ThemesSettings() {
   const [editValue, setEditValue] = useState('');
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  
+  // Transition modal state
+  const [transitionModal, setTransitionModal] = useState<{
+    open: boolean;
+    statusToRemove: string;
+    statusIndex: number;
+    targetStatus: string;
+  }>({
+    open: false,
+    statusToRemove: '',
+    statusIndex: -1,
+    targetStatus: '',
+  });
 
   // Fetch all themes to check which statuses are in use
   const { data: themes } = useQuery({
@@ -52,17 +67,54 @@ export function ThemesSettings() {
     }
   };
 
+  // Transition mutation
+  const transitionMutation = useMutation({
+    mutationFn: ({ oldStatus, newStatus }: { oldStatus: string; newStatus: string }) =>
+      api.themes.transitionStatus(oldStatus, newStatus),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['themes'] });
+      // Remove the status from the local workflow
+      updateStatuses(statuses.filter((_, i) => i !== transitionModal.statusIndex));
+      handleCloseTransitionModal();
+    },
+  });
+
   const handleRemoveStatus = (index: number) => {
     const statusToRemove = statuses[index];
     const usageCount = statusUsage[statusToRemove] || 0;
     
     if (usageCount > 0) {
-      alert(`Cannot remove "${statusToRemove}" - it is used by ${usageCount} theme(s). Change the theme status first.`);
+      // Show transition modal instead of blocking
+      const availableStatuses = statuses.filter((_, i) => i !== index);
+      setTransitionModal({
+        open: true,
+        statusToRemove,
+        statusIndex: index,
+        targetStatus: availableStatuses[0] || '',
+      });
       return;
     }
     
     if (statuses.length > 1) {
       updateStatuses(statuses.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleCloseTransitionModal = () => {
+    setTransitionModal({
+      open: false,
+      statusToRemove: '',
+      statusIndex: -1,
+      targetStatus: '',
+    });
+  };
+
+  const handleConfirmTransition = () => {
+    if (transitionModal.statusToRemove && transitionModal.targetStatus) {
+      transitionMutation.mutate({
+        oldStatus: transitionModal.statusToRemove,
+        newStatus: transitionModal.targetStatus,
+      });
     }
   };
 
@@ -197,13 +249,12 @@ export function ThemesSettings() {
                 {statuses.length > 1 && (
                   <button
                     onClick={() => handleRemoveStatus(index)}
-                    disabled={(statusUsage[status] || 0) > 0}
                     className={`p-1 transition-opacity ${
                       (statusUsage[status] || 0) > 0
-                        ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
+                        ? 'text-amber-500 hover:text-amber-600 opacity-0 group-hover:opacity-100'
                         : 'text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100'
                     }`}
-                    title={(statusUsage[status] || 0) > 0 ? `Cannot remove - used by ${statusUsage[status]} theme(s)` : 'Remove status'}
+                    title={(statusUsage[status] || 0) > 0 ? `Remove and transition ${statusUsage[status]} theme(s)` : 'Remove status'}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -240,6 +291,46 @@ export function ThemesSettings() {
           </p>
         </div>
       </div>
+
+      {/* Status Transition Modal */}
+      <FormModal
+        isOpen={transitionModal.open}
+        onClose={handleCloseTransitionModal}
+        onSubmit={handleConfirmTransition}
+        title="Remove Status"
+        submitLabel="Remove & Transition"
+        loadingLabel="Transitioning..."
+        isLoading={transitionMutation.isPending}
+      >
+        <div className="space-y-4">
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              The status <strong className="capitalize">"{transitionModal.statusToRemove}"</strong> is currently used by{' '}
+              <strong>{statusUsage[transitionModal.statusToRemove] || 0} theme(s)</strong>.
+            </p>
+          </div>
+          
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            To remove this status, all themes with this status will be transitioned to another status.
+          </p>
+          
+          <SelectInput
+            label="Transition themes to"
+            value={transitionModal.targetStatus}
+            onChange={(e) => setTransitionModal({ ...transitionModal, targetStatus: e.target.value })}
+            options={statuses
+              .filter((s) => s !== transitionModal.statusToRemove)
+              .map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }))}
+          />
+          
+          <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              This action will update {statusUsage[transitionModal.statusToRemove] || 0} theme(s) to the new status
+              and remove "{transitionModal.statusToRemove}" from the workflow.
+            </p>
+          </div>
+        </div>
+      </FormModal>
     </div>
   );
 }
