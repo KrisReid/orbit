@@ -185,6 +185,41 @@ class TaskTypeService:
             count += 1
         
         return count
+    
+    async def transition_status(
+        self,
+        task_type_id: int,
+        old_status: str,
+        new_status: str,
+    ) -> int:
+        """Transition all tasks from one status to another within the same task type.
+        
+        This is used when removing a status from a workflow - all tasks with that
+        status need to be moved to a different status first.
+        """
+        task_type = await self.get_task_type(task_type_id)
+        
+        # Verify new_status is valid for this task type
+        if new_status not in task_type.workflow:
+            raise ValidationError(f"Status '{new_status}' is not in the workflow for this task type")
+        
+        # Get task repository
+        task_repo = TaskRepository(self.session)
+        
+        # Get all tasks with the old status
+        tasks = await task_repo.get_all_filtered(
+            task_type_id=task_type_id,
+            statuses=[old_status],
+            limit=10000  # High limit to get all
+        )
+        
+        # Update each task to new status
+        count = 0
+        for task in tasks:
+            await task_repo.update(task, status=new_status)
+            count += 1
+        
+        return count
 
 
 class TaskService:

@@ -188,13 +188,43 @@ class ProjectTypeService:
         for project in projects:
             new_status = status_map.get(project.status, default_status)
             await self.project_repo.update(
-                project, 
-                project_type_id=target_type_id, 
+                project,
+                project_type_id=target_type_id,
                 status=new_status
             )
             migrated_count += 1
             
         return migrated_count
+    
+    async def transition_status(self, project_type_id: int, old_status: str, new_status: str) -> int:
+        """
+        Transition all projects from one status to another within the same project type.
+        Used when removing a status from the workflow.
+        
+        Args:
+            project_type_id: The project type to update
+            old_status: The status to transition from
+            new_status: The status to transition to
+            
+        Returns:
+            Number of projects transitioned
+        """
+        # Validate project type exists
+        pt = await self.get_project_type(project_type_id)
+        
+        # Get all projects with the old status
+        projects = await self.project_repo.get_all_filtered(
+            limit=10000,
+            project_type_ids=[project_type_id],
+            statuses=[old_status]
+        )
+        
+        count = 0
+        for project in projects:
+            await self.project_repo.update(project, status=new_status)
+            count += 1
+        
+        return count
 
 class ProjectService:
     def __init__(self, session: AsyncSession):

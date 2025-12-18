@@ -160,3 +160,26 @@ async def migrate_task_type(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/{task_type_id}/transition-status", response_model=MessageResponse)
+async def transition_task_status(
+    task_type_id: int,
+    old_status: str,
+    new_status: str,
+    db: DbSession,
+    _: CurrentAdmin,
+):
+    """Transition all tasks from one status to another within this task type.
+    
+    Used when removing a status from the workflow - all tasks with that status
+    need to be moved to a different status first. Admin only.
+    """
+    try:
+        service = TaskTypeService(db)
+        count = await service.transition_status(task_type_id, old_status, new_status)
+        return MessageResponse(message=f"Successfully transitioned {count} tasks from '{old_status}' to '{new_status}'.")
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

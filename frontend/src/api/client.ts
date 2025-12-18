@@ -306,6 +306,13 @@ class ApiClient {
       const response = await this.client.delete(`/project-types/${projectTypeId}/fields/${fieldId}`);
       return response.data;
     },
+
+    transitionStatus: async (projectTypeId: number, oldStatus: string, newStatus: string): Promise<MessageResponse> => {
+      const response = await this.client.post<MessageResponse>(`/project-types/${projectTypeId}/transition-status`, null, {
+        params: { old_status: oldStatus, new_status: newStatus },
+      });
+      return response.data;
+    },
   };
 
   // ============================================
@@ -429,6 +436,13 @@ class ApiClient {
       const response = await this.client.post<MessageResponse>(`/task-types/${id}/migrate`, {
         target_id: targetTypeId,
         status_mappings: statusMappings,
+      });
+      return response.data;
+    },
+
+    transitionStatus: async (taskTypeId: number, oldStatus: string, newStatus: string): Promise<MessageResponse> => {
+      const response = await this.client.post<MessageResponse>(`/task-types/${taskTypeId}/transition-status`, null, {
+        params: { old_status: oldStatus, new_status: newStatus },
       });
       return response.data;
     },

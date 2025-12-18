@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { FormModal, SelectInput } from '@/components/ui';
 import type { ProjectTypeField, FieldType } from '@/types';
 import { Plus, Pencil, Trash2, GripVertical, ChevronDown, ChevronUp, X } from 'lucide-react';
 
@@ -15,6 +16,17 @@ export function ProjectTypesSettings() {
   const [targetTypeId, setTargetTypeId] = useState<number | null>(null);
   const [statusMappings, setStatusMappings] = useState<Record<string, string>>({});
   const [expandedTypeId, setExpandedTypeId] = useState<number | null>(null);
+  
+  // Status transition modal state
+  const [transitionModal, setTransitionModal] = useState<{
+    open: boolean;
+    projectTypeId: number;
+    statusToRemove: string;
+    projectCount: number;
+    availableStatuses: string[];
+    targetStatus: string;
+    onSuccess: () => void;
+  } | null>(null);
 
   const { data: projectTypes, isLoading } = useQuery({
     queryKey: ['projectTypes'],
@@ -77,6 +89,20 @@ export function ProjectTypesSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projectTypes'] });
       deleteMutation.mutate(deleteType!.id);
+    },
+  });
+
+  const transitionStatusMutation = useMutation({
+    mutationFn: ({ projectTypeId, oldStatus, newStatus }: { projectTypeId: number; oldStatus: string; newStatus: string }) =>
+      api.projectTypes.transitionStatus(projectTypeId, oldStatus, newStatus),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projectTypes'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      // Call the success callback to update the workflow
+      if (transitionModal?.onSuccess) {
+        transitionModal.onSuccess();
+      }
+      setTransitionModal(null);
     },
   });
 
@@ -229,7 +255,69 @@ export function ProjectTypesSettings() {
           onClose={() => { setEditingType(null); setEditTypeStats(null); }}
           onSubmit={(data) => updateMutation.mutate({ id: editingType.id, data })}
           isLoading={updateMutation.isPending}
+          onRequestTransition={(statusToRemove, projectCount, availableStatuses, onSuccess) => {
+            setTransitionModal({
+              open: true,
+              projectTypeId: editingType.id,
+              statusToRemove,
+              projectCount,
+              availableStatuses,
+              targetStatus: availableStatuses[0] || '',
+              onSuccess,
+            });
+          }}
         />
+      )}
+
+      {/* Status Transition Modal */}
+      {transitionModal && (
+        <FormModal
+          isOpen={transitionModal.open}
+          onClose={() => setTransitionModal(null)}
+          onSubmit={() => {
+            if (transitionModal.targetStatus) {
+              transitionStatusMutation.mutate({
+                projectTypeId: transitionModal.projectTypeId,
+                oldStatus: transitionModal.statusToRemove,
+                newStatus: transitionModal.targetStatus,
+              });
+            }
+          }}
+          title="Remove Status from Workflow"
+          submitLabel="Transition & Remove"
+          loadingLabel="Transitioning..."
+          isLoading={transitionStatusMutation.isPending}
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                The status <strong className="capitalize">"{transitionModal.statusToRemove}"</strong> is currently used by{' '}
+                <strong>{transitionModal.projectCount} project(s)</strong>.
+              </p>
+            </div>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              To remove this status from the workflow, all projects with this status will be transitioned to another status.
+            </p>
+            
+            <SelectInput
+              label="Transition projects to"
+              value={transitionModal.targetStatus}
+              onChange={(e) => setTransitionModal({ ...transitionModal, targetStatus: e.target.value })}
+              options={transitionModal.availableStatuses.map((s) => ({
+                value: s,
+                label: s.charAt(0).toUpperCase() + s.slice(1),
+              }))}
+            />
+            
+            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                This action will update {transitionModal.projectCount} project(s) to the new status
+                and remove "{transitionModal.statusToRemove}" from the workflow.
+              </p>
+            </div>
+          </div>
+        </FormModal>
       )}
 
       {deleteType && typeStats && (
@@ -619,20 +707,21 @@ function ProjectTypeModal({ onClose, onSubmit, isLoading }: { onClose: () => voi
   );
 }
 
-function ProjectTypeEditModal({ projectType, stats, onClose, onSubmit, isLoading }: {
+function ProjectTypeEditModal({ projectType, stats, onClose, onSubmit, isLoading, onRequestTransition }: {
   projectType: { id: number; name: string; slug: string; workflow: string[]; description?: string | null };
   stats: { total_projects: number; projects_by_status: Record<string, number>; workflow: string[] };
   onClose: () => void;
   onSubmit: (data: { name?: string; description?: string; workflow?: string[] }) => void;
   isLoading: boolean;
+  onRequestTransition?: (statusToRemove: string, projectCount: number, availableStatuses: string[], onSuccess: () => void) => void;
 }) {
   const [name, setName] = useState(projectType.name);
   const [description, setDescription] = useState(projectType.description || '');
   const [workflow, setWorkflow] = useState(projectType.workflow.join(', '));
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const [pendingWorkflow, setPendingWorkflow] = useState<string[] | null>(null);
 
-  // Statuses that have projects and cannot be removed
-  const lockedStatuses = Object.entries(stats.projects_by_status)
+  // Statuses that have projects
+  const statusesWithProjects = Object.entries(stats.projects_by_status)
     .filter(([_, count]) => count > 0)
     .map(([status]) => status);
 
@@ -640,15 +729,25 @@ function ProjectTypeEditModal({ projectType, stats, onClose, onSubmit, isLoading
     e.preventDefault();
     const newWorkflow = workflow.split(',').map(s => s.trim()).filter(Boolean);
     
-    // Check if any locked status is being removed
-    const removedLockedStatuses = lockedStatuses.filter(status => !newWorkflow.includes(status));
+    // Check if any status with projects is being removed
+    const removedStatusesWithProjects = statusesWithProjects.filter(status => !newWorkflow.includes(status));
     
-    if (removedLockedStatuses.length > 0) {
-      setValidationError(`Cannot remove status "${removedLockedStatuses[0]}" - it has ${stats.projects_by_status[removedLockedStatuses[0]]} active project(s). Migrate projects first.`);
+    if (removedStatusesWithProjects.length > 0 && onRequestTransition) {
+      const statusToRemove = removedStatusesWithProjects[0];
+      const projectCount = stats.projects_by_status[statusToRemove];
+      // Available statuses are the ones that will remain in the new workflow
+      const availableStatuses = newWorkflow.filter(s => s !== statusToRemove);
+      
+      // Store the pending workflow to apply after transition
+      setPendingWorkflow(newWorkflow);
+      
+      onRequestTransition(statusToRemove, projectCount, availableStatuses, () => {
+        // After successful transition, submit the updated workflow
+        onSubmit({ name, description: description || undefined, workflow: newWorkflow });
+      });
       return;
     }
     
-    setValidationError(null);
     onSubmit({ name, description: description || undefined, workflow: newWorkflow });
   };
 
@@ -677,18 +776,18 @@ function ProjectTypeEditModal({ projectType, stats, onClose, onSubmit, isLoading
               <div className="mb-2 flex flex-wrap gap-2">
                 {projectType.workflow.map((status) => {
                   const count = stats.projects_by_status[status] || 0;
-                  const isLocked = count > 0;
+                  const hasProjects = count > 0;
                   return (
                     <span
                       key={status}
                       className={`inline-flex items-center px-2 py-1 text-xs rounded ${
-                        isLocked
+                        hasProjects
                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
                           : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                       }`}
                     >
                       {status}
-                      {isLocked && <span className="ml-1 font-medium">({count})</span>}
+                      {hasProjects && <span className="ml-1 font-medium">({count})</span>}
                     </span>
                   );
                 })}
@@ -697,16 +796,13 @@ function ProjectTypeEditModal({ projectType, stats, onClose, onSubmit, isLoading
                 type="text"
                 required
                 value={workflow}
-                onChange={(e) => { setWorkflow(e.target.value); setValidationError(null); }}
+                onChange={(e) => setWorkflow(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700"
               />
-              {lockedStatuses.length > 0 && (
+              {statusesWithProjects.length > 0 && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Statuses with projects (highlighted) cannot be removed
+                  Statuses with projects (highlighted) will prompt for migration when removed
                 </p>
-              )}
-              {validationError && (
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">{validationError}</p>
               )}
             </div>
             <div className="flex justify-end space-x-3 pt-4">

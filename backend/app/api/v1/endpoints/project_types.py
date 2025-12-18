@@ -83,6 +83,28 @@ async def migrate_project_type(id: int, data: MigrationRequest, db: DbSession, _
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+@router.post("/{id}/transition-status", response_model=MessageResponse)
+async def transition_project_status(
+    id: int,
+    old_status: str,
+    new_status: str,
+    db: DbSession,
+    _: CurrentAdmin,
+):
+    """
+    Transition all projects from one status to another within the same project type.
+    Used when removing a status from the workflow.
+    """
+    try:
+        service = ProjectTypeService(db)
+        count = await service.transition_status(id, old_status, new_status)
+        return MessageResponse(message=f"Transitioned {count} project(s) from '{old_status}' to '{new_status}'")
+    except EntityNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 # ============================================
 # Field Management Endpoints
 # ============================================

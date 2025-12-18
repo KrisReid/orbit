@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
+import { FormModal, SelectInput } from '@/components/ui';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 
 export function TaskTypesSettings() {
@@ -12,6 +13,17 @@ export function TaskTypesSettings() {
   const [typeStats, setTypeStats] = useState<{ total_tasks: number; tasks_by_status: Record<string, number>; workflow: string[]; team_id: number } | null>(null);
   const [targetTypeId, setTargetTypeId] = useState<number | null>(null);
   const [statusMappings, setStatusMappings] = useState<Record<string, string>>({});
+  
+  // Status transition modal state
+  const [transitionModal, setTransitionModal] = useState<{
+    open: boolean;
+    taskTypeId: number;
+    statusToRemove: string;
+    taskCount: number;
+    availableStatuses: string[];
+    targetStatus: string;
+    onSuccess: () => void;
+  } | null>(null);
 
   const { data: teams } = useQuery({
     queryKey: ['teams'],
@@ -48,6 +60,20 @@ export function TaskTypesSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['taskTypes'] });
       deleteMutation.mutate(deleteType!.id);
+    },
+  });
+
+  const transitionStatusMutation = useMutation({
+    mutationFn: ({ taskTypeId, oldStatus, newStatus }: { taskTypeId: number; oldStatus: string; newStatus: string }) =>
+      api.taskTypes.transitionStatus(taskTypeId, oldStatus, newStatus),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['taskTypes'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      // Call the success callback to update the workflow
+      if (transitionModal?.onSuccess) {
+        transitionModal.onSuccess();
+      }
+      setTransitionModal(null);
     },
   });
 
@@ -160,7 +186,69 @@ export function TaskTypesSettings() {
           onClose={() => { setEditingType(null); setEditTypeStats(null); }}
           onSubmit={(data) => updateMutation.mutate({ id: editingType.id, data })}
           isLoading={updateMutation.isPending}
+          onRequestTransition={(statusToRemove: string, taskCount: number, availableStatuses: string[], onSuccess: () => void) => {
+            setTransitionModal({
+              open: true,
+              taskTypeId: editingType.id,
+              statusToRemove,
+              taskCount,
+              availableStatuses,
+              targetStatus: availableStatuses[0] || '',
+              onSuccess,
+            });
+          }}
         />
+      )}
+
+      {/* Status Transition Modal */}
+      {transitionModal && (
+        <FormModal
+          isOpen={transitionModal.open}
+          onClose={() => setTransitionModal(null)}
+          onSubmit={() => {
+            if (transitionModal.targetStatus) {
+              transitionStatusMutation.mutate({
+                taskTypeId: transitionModal.taskTypeId,
+                oldStatus: transitionModal.statusToRemove,
+                newStatus: transitionModal.targetStatus,
+              });
+            }
+          }}
+          title="Remove Status from Workflow"
+          submitLabel="Transition & Remove"
+          loadingLabel="Transitioning..."
+          isLoading={transitionStatusMutation.isPending}
+        >
+          <div className="space-y-4">
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                The status <strong className="capitalize">"{transitionModal.statusToRemove}"</strong> is currently used by{' '}
+                <strong>{transitionModal.taskCount} task(s)</strong>.
+              </p>
+            </div>
+            
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              To remove this status from the workflow, all tasks with this status will be transitioned to another status.
+            </p>
+            
+            <SelectInput
+              label="Transition tasks to"
+              value={transitionModal.targetStatus}
+              onChange={(e) => setTransitionModal({ ...transitionModal, targetStatus: e.target.value })}
+              options={transitionModal.availableStatuses.map((s) => ({
+                value: s,
+                label: s.charAt(0).toUpperCase() + s.slice(1),
+              }))}
+            />
+            
+            <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                This action will update {transitionModal.taskCount} task(s) to the new status
+                and remove "{transitionModal.statusToRemove}" from the workflow.
+              </p>
+            </div>
+          </div>
+        </FormModal>
       )}
 
       {deleteType && typeStats && (
@@ -224,20 +312,20 @@ function TaskTypeModal({ teams, onClose, onSubmit, isLoading }: { teams: { id: n
   );
 }
 
-function TaskTypeEditModal({ taskType, stats, onClose, onSubmit, isLoading }: {
+function TaskTypeEditModal({ taskType, stats, onClose, onSubmit, isLoading, onRequestTransition }: {
   taskType: { id: number; name: string; slug: string; workflow: string[]; description?: string | null; team_id: number };
   stats: { total_tasks: number; tasks_by_status: Record<string, number>; workflow: string[]; team_id: number };
   onClose: () => void;
   onSubmit: (data: { name?: string; description?: string; workflow?: string[] }) => void;
   isLoading: boolean;
+  onRequestTransition?: (statusToRemove: string, taskCount: number, availableStatuses: string[], onSuccess: () => void) => void;
 }) {
   const [name, setName] = useState(taskType.name);
   const [description, setDescription] = useState(taskType.description || '');
   const [workflow, setWorkflow] = useState(taskType.workflow.join(', '));
-  const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Statuses that have tasks and cannot be removed
-  const lockedStatuses = Object.entries(stats.tasks_by_status)
+  // Statuses that have tasks
+  const statusesWithTasks = Object.entries(stats.tasks_by_status)
     .filter(([_, count]) => count > 0)
     .map(([status]) => status);
 
@@ -245,15 +333,22 @@ function TaskTypeEditModal({ taskType, stats, onClose, onSubmit, isLoading }: {
     e.preventDefault();
     const newWorkflow = workflow.split(',').map(s => s.trim()).filter(Boolean);
     
-    // Check if any locked status is being removed
-    const removedLockedStatuses = lockedStatuses.filter(status => !newWorkflow.includes(status));
+    // Check if any status with tasks is being removed
+    const removedStatusesWithTasks = statusesWithTasks.filter(status => !newWorkflow.includes(status));
     
-    if (removedLockedStatuses.length > 0) {
-      setValidationError(`Cannot remove status "${removedLockedStatuses[0]}" - it has ${stats.tasks_by_status[removedLockedStatuses[0]]} active task(s). Migrate tasks first.`);
+    if (removedStatusesWithTasks.length > 0 && onRequestTransition) {
+      const statusToRemove = removedStatusesWithTasks[0];
+      const taskCount = stats.tasks_by_status[statusToRemove];
+      // Available statuses are the ones that will remain in the new workflow
+      const availableStatuses = newWorkflow.filter(s => s !== statusToRemove);
+      
+      onRequestTransition(statusToRemove, taskCount, availableStatuses, () => {
+        // After successful transition, submit the updated workflow
+        onSubmit({ name, description: description || undefined, workflow: newWorkflow });
+      });
       return;
     }
     
-    setValidationError(null);
     onSubmit({ name, description: description || undefined, workflow: newWorkflow });
   };
 
@@ -282,18 +377,18 @@ function TaskTypeEditModal({ taskType, stats, onClose, onSubmit, isLoading }: {
               <div className="mb-2 flex flex-wrap gap-2">
                 {taskType.workflow.map((status) => {
                   const count = stats.tasks_by_status[status] || 0;
-                  const isLocked = count > 0;
+                  const hasTasks = count > 0;
                   return (
                     <span
                       key={status}
                       className={`inline-flex items-center px-2 py-1 text-xs rounded ${
-                        isLocked
+                        hasTasks
                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
                           : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                       }`}
                     >
                       {status}
-                      {isLocked && <span className="ml-1 font-medium">({count})</span>}
+                      {hasTasks && <span className="ml-1 font-medium">({count})</span>}
                     </span>
                   );
                 })}
@@ -302,16 +397,13 @@ function TaskTypeEditModal({ taskType, stats, onClose, onSubmit, isLoading }: {
                 type="text"
                 required
                 value={workflow}
-                onChange={(e) => { setWorkflow(e.target.value); setValidationError(null); }}
+                onChange={(e) => setWorkflow(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700"
               />
-              {lockedStatuses.length > 0 && (
+              {statusesWithTasks.length > 0 && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Statuses with tasks (highlighted) cannot be removed
+                  Statuses with tasks (highlighted) will prompt for migration when removed
                 </p>
-              )}
-              {validationError && (
-                <p className="text-xs text-red-600 dark:text-red-400 mt-1">{validationError}</p>
               )}
             </div>
             <div className="flex justify-end space-x-3 pt-4">
