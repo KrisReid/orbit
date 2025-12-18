@@ -119,13 +119,15 @@ interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'typ
   error?: string;
 }
 
-export function Checkbox({ label, error, className = '', id, ...props }: CheckboxProps) {
+export function Checkbox({ label, error, className = '', id, checked, onChange, ...props }: CheckboxProps) {
   return (
     <div>
       <label className={`flex items-center gap-2 cursor-pointer ${className}`}>
         <input
           type="checkbox"
           id={id}
+          checked={checked}
+          onChange={onChange}
           className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
           {...props}
         />

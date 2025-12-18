@@ -16,6 +16,7 @@ import {
 
 interface CardDisplaySettings {
   showId: boolean;
+  showPoints: boolean;
   showProject: boolean;
   showRelease: boolean;
   showBlockers: boolean;
@@ -31,6 +32,7 @@ export function BoardPage() {
   const [showDisplaySettings, setShowDisplaySettings] = useState(false);
   const [cardDisplay, setCardDisplay] = useState<CardDisplaySettings>({
     showId: true,
+    showPoints: true,
     showProject: true,
     showRelease: false,
     showBlockers: true,
@@ -154,27 +156,50 @@ export function BoardPage() {
                   <Checkbox
                     label="Show ID"
                     checked={cardDisplay.showId}
-                    onChange={(e) => setCardDisplay({ ...cardDisplay, showId: e.target.checked })}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setCardDisplay(prev => ({ ...prev, showId: checked }));
+                    }}
+                  />
+                  <Checkbox
+                    label="Show Points"
+                    checked={cardDisplay.showPoints}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setCardDisplay(prev => ({ ...prev, showPoints: checked }));
+                    }}
                   />
                   <Checkbox
                     label="Show Project"
                     checked={cardDisplay.showProject}
-                    onChange={(e) => setCardDisplay({ ...cardDisplay, showProject: e.target.checked })}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setCardDisplay(prev => ({ ...prev, showProject: checked }));
+                    }}
                   />
                   <Checkbox
                     label="Show Release"
                     checked={cardDisplay.showRelease}
-                    onChange={(e) => setCardDisplay({ ...cardDisplay, showRelease: e.target.checked })}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setCardDisplay(prev => ({ ...prev, showRelease: checked }));
+                    }}
                   />
                   <Checkbox
                     label="Show Blockers"
                     checked={cardDisplay.showBlockers}
-                    onChange={(e) => setCardDisplay({ ...cardDisplay, showBlockers: e.target.checked })}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setCardDisplay(prev => ({ ...prev, showBlockers: checked }));
+                    }}
                   />
                   <Checkbox
                     label="Show Github"
                     checked={cardDisplay.showGithub}
-                    onChange={(e) => setCardDisplay({ ...cardDisplay, showGithub: e.target.checked })}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setCardDisplay(prev => ({ ...prev, showGithub: checked }));
+                    }}
                   />
                 </div>
               </div>
@@ -317,27 +342,29 @@ function TaskCard({ task, cardDisplay, onDragStart, onClick }: TaskCardProps) {
       onClick={onClick}
       className="bg-white dark:bg-gray-700 rounded-lg p-3 shadow-sm border border-gray-200 dark:border-gray-600 cursor-pointer hover:shadow-md transition-shadow"
     >
-      {cardDisplay.showId && (
+      {(cardDisplay.showId || cardDisplay.showPoints) && (
         <div className="flex items-center justify-between mb-2">
-          <span className="font-mono text-xs text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded">
-            {task.display_id}
-          </span>
-          {task.estimation && (
+          {cardDisplay.showId && (
+            <span className="font-mono text-xs text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30 px-1.5 py-0.5 rounded">
+              {task.display_id}
+            </span>
+          )}
+          {cardDisplay.showPoints && task.estimation && (
             <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-600 px-1.5 py-0.5 rounded">
               {task.estimation}
             </span>
           )}
         </div>
       )}
+      <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-2">
+        {task.title}
+      </p>
       {cardDisplay.showProject && task.project && (
-        <p className="mb-1 text-xs text-primary-600 dark:text-primary-400 flex items-center gap-1">
+        <p className="mt-1 text-xs text-primary-600 dark:text-primary-400 flex items-center gap-1">
           <span className="inline-block w-2 h-2 bg-primary-400 rounded-sm" />
           {task.project.title}
         </p>
       )}
-      <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-2">
-        {task.title}
-      </p>
       {cardDisplay.showRelease && task.release && (
         <p className="mt-2 text-xs text-purple-600 dark:text-purple-400 flex items-center gap-1">
           <span className="inline-block w-2 h-2 bg-purple-400 rounded-full" />

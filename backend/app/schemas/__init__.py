@@ -243,6 +243,23 @@ class ReleaseSummary(BaseModel):
     title: str
     status: ReleaseStatus
 
+# --- GitHub Schemas (moved before Tasks for forward reference) ---
+class GitHubLinkCreate(BaseModel):
+    task_id: int
+    link_type: GitHubLinkType
+    repository_owner: str
+    repository_name: str
+    url: str
+    pr_number: int | None = None
+    pr_title: str | None = None
+    pr_status: GitHubPRStatus | None = None
+
+class GitHubLinkResponse(GitHubLinkCreate):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
 # --- Auth/User Schemas ---
 class Token(BaseModel):
     access_token: str
@@ -297,6 +314,29 @@ class TaskUpdate(BaseModel):
     estimation: str | None = None
     custom_data: dict[str, Any] | None = None
 
+class TeamSummary(BaseModel):
+    """Summary of a team for task responses."""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    slug: str
+
+class TaskTypeSummary(BaseModel):
+    """Summary of a task type for task responses."""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    slug: str
+    color: str | None = None
+
+class DependencySummary(BaseModel):
+    """Summary of a dependency for task responses."""
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    display_id: str
+    title: str
+    status: str
+
 class TaskResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -312,6 +352,13 @@ class TaskResponse(BaseModel):
     custom_data: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
+    # Nested relationships
+    team: TeamSummary | None = None
+    task_type: TaskTypeSummary | None = None
+    project: ProjectSummary | None = None
+    release: ReleaseSummary | None = None
+    dependencies: list[DependencySummary] = []
+    github_links: list[GitHubLinkResponse] = []
 
 # --- Team Schemas ---
 class TeamMemberResponse(BaseModel):
@@ -345,23 +392,6 @@ class TeamStatsResponse(BaseModel):
     total_tasks: int
     tasks_by_status: dict[str, int]
 
-# --- GitHub Schemas ---
-class GitHubLinkCreate(BaseModel):
-    task_id: int
-    link_type: GitHubLinkType
-    repository_owner: str
-    repository_name: str
-    url: str
-    pr_number: int | None = None
-    pr_title: str | None = None
-    pr_status: GitHubPRStatus | None = None
-
-class GitHubLinkResponse(GitHubLinkCreate):
-    model_config = ConfigDict(from_attributes=True)
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
 # --- Aliases for Backward Compatibility ---
 # These map the "Response" models to the generic names expected by old endpoints
 User = UserResponse
@@ -379,3 +409,4 @@ ProjectResponse.model_rebuild()
 ProjectDetailResponse.model_rebuild()
 ThemeWithProjectsResponse.model_rebuild()
 TeamResponse.model_rebuild()
+TaskResponse.model_rebuild()
