@@ -37,6 +37,9 @@ export function ProjectsPage() {
   const [projectTypeId, setProjectTypeId] = useState<number>(0);
   const [themeId, setThemeId] = useState<number | null>(null);
   const [customData, setCustomData] = useState<Record<string, unknown>>({});
+  
+  // Validation errors
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { data: projects, isLoading } = useQuery({
     queryKey: ['projects', { project_type_ids: filterTypes, statuses: filterStatuses }],
@@ -103,6 +106,32 @@ export function ProjectsPage() {
     setProjectTypeId(projectTypes?.items?.[0]?.id || 0);
     setThemeId(null);
     setCustomData({});
+    setErrors({});
+  };
+
+  // Validate form and return true if valid
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    // Validate title (required)
+    if (!title.trim()) {
+      newErrors.title = 'Title is required';
+    }
+    
+    // Validate required custom fields
+    customFields.forEach((field) => {
+      if (field.required) {
+        const value = customData[field.key];
+        const isEmpty = value === undefined || value === null || value === '' ||
+          (Array.isArray(value) && value.length === 0);
+        if (isEmpty) {
+          newErrors[`custom_${field.key}`] = `${field.label} is required`;
+        }
+      }
+    });
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleOpenCreate = () => {
@@ -111,6 +140,10 @@ export function ProjectsPage() {
   };
 
   const handleSubmit = () => {
+    if (!validateForm()) {
+      return;
+    }
+    
     createMutation.mutate({
       title,
       description: description || undefined,
@@ -122,7 +155,19 @@ export function ProjectsPage() {
 
   const handleCustomFieldChange = (key: string, value: unknown) => {
     setCustomData((prev) => ({ ...prev, [key]: value }));
+    // Clear error for this field if it exists
+    if (errors[`custom_${key}`]) {
+      setErrors((prev) => ({ ...prev, [`custom_${key}`]: '' }));
+    }
   };
+
+  // Extract custom field errors for the CustomFields component
+  const customFieldErrors = Object.entries(errors)
+    .filter(([key]) => key.startsWith('custom_'))
+    .reduce((acc, [key, value]) => {
+      acc[key.replace('custom_', '')] = value;
+      return acc;
+    }, {} as Record<string, string>);
 
   // Create a map of project type ID to workflow for quick lookup
   const projectTypeWorkflows = new Map<number, string[]>();
@@ -323,7 +368,13 @@ export function ProjectsPage() {
             label="Title"
             required
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              if (errors.title) {
+                setErrors((prev) => ({ ...prev, title: '' }));
+              }
+            }}
+            error={errors.title}
           />
           
           <SelectInput
@@ -364,6 +415,7 @@ export function ProjectsPage() {
                 fields={customFields}
                 values={customData}
                 onChange={handleCustomFieldChange}
+                errors={customFieldErrors}
               />
             </div>
           )}

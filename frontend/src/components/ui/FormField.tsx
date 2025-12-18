@@ -294,9 +294,10 @@ interface DynamicFieldProps {
   value: unknown;
   onChange: (value: unknown) => void;
   disabled?: boolean;
+  error?: string;
 }
 
-export function DynamicField({ field, value, onChange, disabled = false }: DynamicFieldProps) {
+export function DynamicField({ field, value, onChange, disabled = false, error }: DynamicFieldProps) {
   switch (field.field_type) {
     case 'text':
       return (
@@ -306,6 +307,7 @@ export function DynamicField({ field, value, onChange, disabled = false }: Dynam
           value={String(value || '')}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
+          error={error}
         />
       );
     case 'textarea':
@@ -317,6 +319,7 @@ export function DynamicField({ field, value, onChange, disabled = false }: Dynam
           onChange={(e) => onChange(e.target.value)}
           rows={3}
           disabled={disabled}
+          error={error}
         />
       );
     case 'number':
@@ -327,6 +330,7 @@ export function DynamicField({ field, value, onChange, disabled = false }: Dynam
           value={value !== undefined && value !== null ? String(value) : ''}
           onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
           disabled={disabled}
+          error={error}
         />
       );
     case 'select':
@@ -339,6 +343,7 @@ export function DynamicField({ field, value, onChange, disabled = false }: Dynam
           options={(field.options || []).map((opt) => ({ value: opt, label: opt }))}
           placeholder={`Select ${field.label.toLowerCase()}...`}
           disabled={disabled}
+          error={error}
         />
       );
     case 'multiselect':
@@ -350,6 +355,7 @@ export function DynamicField({ field, value, onChange, disabled = false }: Dynam
           value={Array.isArray(value) ? value : []}
           onChange={onChange}
           disabled={disabled}
+          error={error}
         />
       );
     case 'url':
@@ -360,6 +366,7 @@ export function DynamicField({ field, value, onChange, disabled = false }: Dynam
           value={String(value || '')}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
+          error={error}
         />
       );
     case 'date':
@@ -370,6 +377,7 @@ export function DynamicField({ field, value, onChange, disabled = false }: Dynam
           value={value ? String(value).split('T')[0] : ''}
           onChange={(e) => onChange(e.target.value || null)}
           disabled={disabled}
+          error={error}
         />
       );
     case 'checkbox':
@@ -379,6 +387,7 @@ export function DynamicField({ field, value, onChange, disabled = false }: Dynam
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
           disabled={disabled}
+          error={error}
         />
       );
     default:
@@ -389,6 +398,7 @@ export function DynamicField({ field, value, onChange, disabled = false }: Dynam
           value={String(value || '')}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
+          error={error}
         />
       );
   }
@@ -400,9 +410,10 @@ interface CustomFieldsProps {
   values: Record<string, unknown>;
   onChange: (key: string, value: unknown) => void;
   disabled?: boolean;
+  errors?: Record<string, string>;
 }
 
-export function CustomFields({ fields, values, onChange, disabled = false }: CustomFieldsProps) {
+export function CustomFields({ fields, values, onChange, disabled = false, errors = {} }: CustomFieldsProps) {
   const sortedFields = [...fields].sort((a, b) => (a.order || 0) - (b.order || 0));
 
   return (
@@ -414,6 +425,7 @@ export function CustomFields({ fields, values, onChange, disabled = false }: Cus
           value={values[field.key]}
           onChange={(value) => onChange(field.key, value)}
           disabled={disabled}
+          error={errors[field.key]}
         />
       ))}
     </div>
