@@ -191,7 +191,7 @@ class TestUserService:
     ):
         """Create user with specified role."""
         sample_user.role = UserRole.ADMIN
-        sample_user.email = "admin@example.com" 
+        sample_user.email = "admin@example.com"
         mock_user_repo.email_exists.return_value = False
         mock_user_repo.create.return_value = sample_user
 
