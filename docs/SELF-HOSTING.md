@@ -38,7 +38,7 @@ Access Orbit at `https://your-domain.com` (or `http://localhost` for local testi
 - Email: `admin@orbit.example.com`
 - Password: `admin123`
 
-> ⚠️ **Change the default password immediately after first login!**
+> ⚠️ **Change the default password immediately after first login!!!**
 
 ---
 
