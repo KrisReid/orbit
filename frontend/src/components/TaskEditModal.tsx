@@ -65,7 +65,7 @@ export function TaskEditModal({
   const [estimation, setEstimation] = useState<number | null>(task.estimation);
   const [projectId, setProjectId] = useState<number | null>(task.project_id);
   const [releaseId, setReleaseId] = useState<number | null>(task.release_id);
-  const [, teamId] = useState(task.team_id);
+  const [teamId] = useState(task.team_id);
   const [taskTypeId, setTaskTypeId] = useState(task.task_type_id);
   const [customData, setCustomData] = useState<Record<string, unknown>>(task.custom_data || {});
   

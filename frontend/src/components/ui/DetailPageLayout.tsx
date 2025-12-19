@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Trash2, LucideIcon } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 import { LoadingSpinner } from './LoadingSpinner';
 
 interface BreadcrumbItem {
