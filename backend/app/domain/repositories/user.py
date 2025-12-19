@@ -30,7 +30,7 @@ class UserRepository(BaseRepository[User]):
         """Get all active users."""
         query = (
             select(User)
-            .where(User.is_active == True)
+            .where(User.is_active)
             .offset(skip)
             .limit(limit)
         )

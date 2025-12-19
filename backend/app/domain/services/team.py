@@ -213,7 +213,7 @@ class TeamService:
     async def add_member(self, team_id: int, user_id: int) -> Team:
         """Add a member to a team."""
         # Verify team exists
-        team = await self.get_team(team_id)
+        _team = await self.get_team(team_id)
         
         # Verify user exists
         user = await self.user_repo.get_by_id(user_id)

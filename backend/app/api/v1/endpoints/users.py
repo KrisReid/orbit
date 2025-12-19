@@ -2,12 +2,10 @@
 Users API Endpoints.
 """
 from typing import Any
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import DbSession, CurrentUser, CurrentAdmin
 from app.core.security import get_password_hash
-from app.domain.entities import User, UserRole
 from app.domain.repositories import UserRepository
 from app.schemas import UserResponse, UserCreate, UserUpdate, PaginatedResponse
 

@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.domain.entities import Team, TeamMember, User, TaskType
+from app.domain.entities import Team, TeamMember, TaskType
 from app.domain.repositories.base import BaseRepository
 
 

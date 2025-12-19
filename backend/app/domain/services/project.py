@@ -52,10 +52,14 @@ class ProjectTypeService:
     async def update_project_type(self, project_type_id: int, name: str = None, description: str = None, workflow: list[str] = None, color: str = None, fields: list[dict] = None) -> ProjectType:
         project_type = await self.get_project_type(project_type_id)
         updates = {}
-        if name is not None: updates["name"] = name
-        if description is not None: updates["description"] = description
-        if workflow is not None: updates["workflow"] = workflow
-        if color is not None: updates["color"] = color
+        if name is not None:
+            updates["name"] = name
+        if description is not None:
+            updates["description"] = description
+        if workflow is not None:
+            updates["workflow"] = workflow
+        if color is not None:
+            updates["color"] = color
         
         if updates:
             project_type = await self.project_type_repo.update(project_type, **updates)
@@ -210,7 +214,7 @@ class ProjectTypeService:
             Number of projects transitioned
         """
         # Validate project type exists
-        pt = await self.get_project_type(project_type_id)
+        _pt = await self.get_project_type(project_type_id)
         
         # Get all projects with the old status
         projects = await self.project_repo.get_all_filtered(
@@ -286,9 +290,12 @@ class ProjectService:
         project = await self.get_project(project_id)
         updates = {}
         
-        if title is not None: updates["title"] = title
-        if description is not None: updates["description"] = description
-        if custom_data is not None: updates["custom_data"] = custom_data
+        if title is not None:
+            updates["title"] = title
+        if description is not None:
+            updates["description"] = description
+        if custom_data is not None:
+            updates["custom_data"] = custom_data
         
         # Handle project type change
         if project_type_id is not None and project_type_id != project.project_type_id:

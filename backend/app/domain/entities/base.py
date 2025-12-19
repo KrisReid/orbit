@@ -3,12 +3,10 @@ SQLAlchemy model base and common utilities.
 """
 from datetime import datetime
 from enum import Enum as PyEnum
-from typing import Any
 
 from sqlalchemy import DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.core.database import Base
 
 
 class TimestampMixin:

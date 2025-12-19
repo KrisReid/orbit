@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import Task, TaskType, GitHubLink, GitHubLinkType, GitHubPRStatus
-from app.domain.exceptions import EntityNotFoundError, EntityAlreadyExistsError, ValidationError
+from app.domain.exceptions import EntityNotFoundError, ValidationError
 from app.domain.repositories import (
     TaskRepository, 
     TaskTypeRepository, 
@@ -159,7 +159,7 @@ class TaskTypeService:
     ) -> int:
         """Migrate tasks from one task type to another with status mapping."""
         # Verify both task types exist
-        source_type = await self.get_task_type(source_type_id)
+        _source_type = await self.get_task_type(source_type_id)
         target_type = await self.get_task_type(target_type_id)
         
         # Get task repository

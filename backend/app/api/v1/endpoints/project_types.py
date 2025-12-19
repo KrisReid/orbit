@@ -1,7 +1,7 @@
 """
 Project Types API.
 """
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status
 from app.api.deps import DbSession, CurrentUser, CurrentAdmin
 from app.domain.services import ProjectTypeService
 from app.domain.exceptions import EntityNotFoundError, EntityAlreadyExistsError

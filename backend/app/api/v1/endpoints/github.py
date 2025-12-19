@@ -4,7 +4,6 @@ GitHub integration API endpoints.
 import re
 import hmac
 import hashlib
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, status, Request, Header
 
