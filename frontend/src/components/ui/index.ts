@@ -48,7 +48,8 @@ export {
 // Data Display
 export { DataTable, TableCellWithIcon, TableActionsCell, TableFilters } from './DataTable';
 export type { Column } from './DataTable';
-export { StatusBadge, getStatusColor, AutoStatusBadge } from './StatusBadge';
+export { StatusBadge, AutoStatusBadge } from './StatusBadge';
+export { getStatusColor, type StatusVariant } from '@/utils/statusUtils';
 export { EmptyState } from './EmptyState';
 
 // Linked Items
