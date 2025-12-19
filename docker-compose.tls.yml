@@ -1,0 +1,80 @@
+# =============================================================================
+# Orbit TLS/HTTPS Overlay
+# =============================================================================
+# Use this with docker-compose.prod.yml for production deployments with TLS
+#
+# Usage:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.tls.yml up -d
+#
+# Requirements:
+#   - Domain must be configured and pointing to this server
+#   - ACME_EMAIL must be set in .env
+#   - Ports 80 and 443 must be accessible from the internet
+# =============================================================================
+
+services:
+  traefik:
+    command:
+      # API and dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      
+      # Redirect HTTP to HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      
+      # Let's Encrypt configuration
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      
+      # Logging
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certificates:/letsencrypt
+
+  backend:
+    labels:
+      - "traefik.enable=true"
+      # Define the service (required to avoid "too many services" error)
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      # API routing with TLS
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend.service=backend"
+      # Health endpoint with TLS
+      - "traefik.http.routers.backend-health.rule=Host(`${DOMAIN}`) && Path(`/health`)"
+      - "traefik.http.routers.backend-health.entrypoints=websecure"
+      - "traefik.http.routers.backend-health.tls=true"
+      - "traefik.http.routers.backend-health.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.backend-health.service=backend"
+
+  frontend:
+    labels:
+      - "traefik.enable=true"
+      # Frontend routing with TLS
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.frontend.priority=1"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+volumes:
+  traefik-certificates:
+    driver: local

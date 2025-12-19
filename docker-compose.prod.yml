@@ -1,0 +1,162 @@
+# =============================================================================
+# Orbit Production Docker Compose
+# =============================================================================
+# This configuration is designed for self-hosted production deployments.
+# It includes:
+# - Traefik reverse proxy
+# - PostgreSQL database with persistent storage
+# - Backend API (FastAPI)
+# - Frontend (nginx serving React SPA)
+#
+# Usage:
+#   Local (HTTP only):
+#     docker compose -f docker-compose.prod.yml up -d
+#
+#   Production (with TLS):
+#     docker compose -f docker-compose.prod.yml -f docker-compose.tls.yml up -d
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Traefik Reverse Proxy
+  # ===========================================================================
+  traefik:
+    image: traefik:v3.0
+    container_name: orbit-traefik
+    restart: unless-stopped
+    command:
+      # API and dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      
+      # Logging
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "80:80"
+      - "8080:8080"  # Dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - orbit-network
+    labels:
+      - "traefik.enable=false"
+
+  # ===========================================================================
+  # PostgreSQL Database
+  # ===========================================================================
+  db:
+    image: postgres:16-alpine
+    container_name: orbit-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orbit}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-orbit}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - orbit-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orbit}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "traefik.enable=false"
+
+  # ===========================================================================
+  # Backend API (FastAPI)
+  # ===========================================================================
+  backend:
+    image: ${IMAGE_REGISTRY:-}orbit-backend:${ORBIT_VERSION:-latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: orbit-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-orbit}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-orbit}
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: https://${DOMAIN:-localhost},http://${DOMAIN:-localhost}
+      DEBUG: ${DEBUG:-false}
+      TASK_ID_PREFIX: ${TASK_ID_PREFIX:-ORBIT}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_PRIVATE_KEY: ${GITHUB_PRIVATE_KEY:-}
+    networks:
+      - orbit-network
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      # Define the service
+      - "traefik.http.services.backend.loadbalancer.server.port=8000"
+      # API routing
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-localhost}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=web"
+      - "traefik.http.routers.backend.service=backend"
+      # Health endpoint
+      - "traefik.http.routers.backend-health.rule=Host(`${DOMAIN:-localhost}`) && Path(`/health`)"
+      - "traefik.http.routers.backend-health.entrypoints=web"
+      - "traefik.http.routers.backend-health.service=backend"
+
+  # ===========================================================================
+  # Frontend (nginx + React SPA)
+  # ===========================================================================
+  frontend:
+    image: ${IMAGE_REGISTRY:-}orbit-frontend:${ORBIT_VERSION:-latest}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api/v1
+    container_name: orbit-frontend
+    restart: unless-stopped
+    networks:
+      - orbit-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      # Frontend routing (catch-all for SPA)
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.routers.frontend.priority=1"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  orbit-network:
+    name: orbit-network
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres-data:
+    driver: local
