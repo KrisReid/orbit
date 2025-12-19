@@ -48,6 +48,8 @@ describe('useAuthStore', () => {
         full_name: 'Test User',
         role: 'user',
         is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       vi.mocked(api.login).mockResolvedValue({ access_token: 'token', token_type: 'bearer' });
@@ -102,6 +104,8 @@ describe('useAuthStore', () => {
         full_name: 'Test User',
         role: 'user',
         is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       vi.mocked(api.isAuthenticated).mockReturnValue(true);

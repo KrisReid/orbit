@@ -4,9 +4,7 @@ Unit tests for security utilities.
 Tests JWT token generation/verification and password hashing.
 """
 from datetime import timedelta
-from unittest.mock import patch
 
-import pytest
 
 from app.core.security import (
     verify_password,

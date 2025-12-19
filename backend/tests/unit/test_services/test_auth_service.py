@@ -3,7 +3,7 @@ Unit tests for AuthService and UserService.
 
 Tests authentication and user management logic with mocked repositories.
 """
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -181,6 +181,10 @@ class TestUserService:
             full_name="Admin User",
             role=UserRole.ADMIN,
         )
+
+        # Verify the returned user has the correct role
+        assert user.role == UserRole.ADMIN
+        assert user.email == "admin@example.com"
         
         # Verify create was called with admin role
         call_kwargs = mock_user_repo.create.call_args.kwargs

@@ -1,17 +1,16 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
-import type { Task, TaskType, TaskTypeField, Team, Project } from '@/types';
+import type { Task, TaskType, Team, Project } from '@/types';
 import { GitBranch, ChevronDown, X, ArrowRight, ArrowLeft, Plus, CheckSquare } from 'lucide-react';
 import {
   WorkflowSelector,
   DynamicField,
   SelectInput,
-  SimpleSelector,
   FormModal,
   EmptyState,
 } from './ui';
-import { useClickOutside, useDropdownClose } from '@/hooks';
+import { useDropdownClose } from '@/hooks';
 
 interface TaskEditModalProps {
   task: Task;
@@ -66,7 +65,7 @@ export function TaskEditModal({
   const [estimation, setEstimation] = useState<number | null>(task.estimation);
   const [projectId, setProjectId] = useState<number | null>(task.project_id);
   const [releaseId, setReleaseId] = useState<number | null>(task.release_id);
-  const [teamId, setTeamId] = useState(task.team_id);
+  const [, teamId] = useState(task.team_id);
   const [taskTypeId, setTaskTypeId] = useState(task.task_type_id);
   const [customData, setCustomData] = useState<Record<string, unknown>>(task.custom_data || {});
   

@@ -3,7 +3,7 @@
  * 
  * Provides wrapper components and utility functions for testing.
  */
-import React, { ReactElement, ReactNode } from 'react';
+import { ReactElement, ReactNode } from 'react';
 import { render, RenderOptions, RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
@@ -42,13 +42,6 @@ function AllProviders({ children }: WrapperProps): ReactElement {
       </BrowserRouter>
     </QueryClientProvider>
   );
-}
-
-/**
- * Wrapper with MemoryRouter for route-specific tests.
- */
-interface MemoryRouterWrapperProps extends WrapperProps {
-  initialEntries?: string[];
 }
 
 function createMemoryRouterWrapper(initialEntries: string[] = ['/']) {

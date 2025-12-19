@@ -314,7 +314,6 @@ export function ProjectTypesSettings() {
 
 // Fields Manager Component
 function ProjectTypeFieldsManager({
-  projectTypeId,
   fields,
   onAddField,
   onUpdateField,
@@ -691,7 +690,7 @@ function ProjectTypeEditModal({ projectType, stats, onClose, onSubmit, isLoading
   const [name, setName] = useState(projectType.name);
   const [description, setDescription] = useState(projectType.description || '');
   const [workflow, setWorkflow] = useState(projectType.workflow.join(', '));
-  const [pendingWorkflow, setPendingWorkflow] = useState<string[] | null>(null);
+  const [, setPendingWorkflow] = useState<string[] | null>(null);
 
   // Statuses that have projects
   const statusesWithProjects = Object.entries(stats.projects_by_status)

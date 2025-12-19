@@ -25,7 +25,7 @@ describe('useClickOutside', () => {
   it('should call handler when clicking outside', () => {
     const handler = vi.fn();
     
-    const { result } = renderHook(() => {
+    renderHook(() => {
       const ref = useRef<HTMLDivElement>(null);
       // @ts-expect-error - Assigning for test purposes
       ref.current = container;

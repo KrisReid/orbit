@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '@/api/client';
-import type { Project, ProjectType } from '@/types';
+import type { Project } from '@/types';
 import { FolderKanban, ExternalLink, Trash2 } from 'lucide-react';
 import {
   PageHeader,

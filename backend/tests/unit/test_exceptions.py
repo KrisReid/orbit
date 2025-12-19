@@ -3,7 +3,6 @@ Unit tests for domain exceptions.
 
 Tests exception creation and attribute access.
 """
-import pytest
 
 from app.domain.exceptions import (
     DomainException,

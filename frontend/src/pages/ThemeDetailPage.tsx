@@ -13,7 +13,6 @@ import {
   InlineEditableTitle,
   InlineEditableTextarea,
   WorkflowSelector,
-  LinkedItemsList,
   LinkedProjectRow,
   FormModal,
   EmptyState,
@@ -114,16 +113,6 @@ export function ThemeDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['theme', id] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-  });
-
-  // Mutation to create a new project
-  const createProjectMutation = useMutation({
-    mutationFn: api.projects.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['theme', id] });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      setShowCreateProjectModal(false);
     },
   });
 

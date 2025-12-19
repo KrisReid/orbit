@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
-import type { ProjectTypeField, Task, TaskType, Project } from '@/types';
+import type { ProjectTypeField, Task, TaskType } from '@/types';
 import { ExternalLink, ChevronDown, Plus, Link as LinkIcon, CheckSquare, FolderKanban, X, ArrowRight, ArrowLeft } from 'lucide-react';
 import { TaskEditModal } from '@/components/TaskEditModal';
 import {
@@ -14,7 +14,6 @@ import {
   InlineEditableTitle,
   WorkflowSelector,
   LinkedTaskRow,
-  LinkedItemsList,
   DebouncedInput,
   DebouncedTextarea,
   BreadcrumbDropdown,
@@ -58,7 +57,7 @@ export function ProjectDetailPage() {
   });
 
   // Fetch all tasks for linking
-  const { data: allTasks, isLoading: tasksLoading } = useQuery({
+  const { data: allTasks } = useQuery({
     queryKey: ['allTasksForLinking'],
     queryFn: () => api.tasks.list({ page_size: 100 }),
   });

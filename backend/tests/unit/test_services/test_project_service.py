@@ -3,7 +3,7 @@ Unit tests for ProjectService and ProjectTypeService.
 
 Tests project management logic with mocked repositories.
 """
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
