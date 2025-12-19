@@ -1,6 +1,7 @@
 """
 Task repository for database operations.
 """
+
 from typing import Sequence
 
 from sqlalchemy import select, func
@@ -14,10 +15,10 @@ from app.core.config import settings
 
 class TaskTypeRepository(BaseRepository[TaskType]):
     """Repository for TaskType entity operations."""
-    
+
     def __init__(self, session: AsyncSession):
         super().__init__(TaskType, session)
-    
+
     async def get_by_slug_and_team(self, slug: str, team_id: int) -> TaskType | None:
         """Get a task type by slug and team."""
         query = (
@@ -27,7 +28,7 @@ class TaskTypeRepository(BaseRepository[TaskType]):
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
-    
+
     async def get_with_fields(self, id: int) -> TaskType | None:
         """Get a task type with fields eagerly loaded."""
         query = (
@@ -37,7 +38,7 @@ class TaskTypeRepository(BaseRepository[TaskType]):
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
-    
+
     async def get_by_team(
         self,
         team_id: int,
@@ -54,7 +55,7 @@ class TaskTypeRepository(BaseRepository[TaskType]):
         )
         result = await self.session.execute(query)
         return result.scalars().all()
-    
+
     async def get_all_with_fields(
         self,
         skip: int = 0,
@@ -63,14 +64,14 @@ class TaskTypeRepository(BaseRepository[TaskType]):
     ) -> Sequence[TaskType]:
         """Get all task types with optional team filter."""
         query = select(TaskType).options(selectinload(TaskType.fields))
-        
+
         if team_id:
             query = query.where(TaskType.team_id == team_id)
-        
+
         query = query.offset(skip).limit(limit)
         result = await self.session.execute(query)
         return result.scalars().all()
-    
+
     async def add_field(self, task_type_id: int, **kwargs) -> TaskTypeField:
         """Add a field to a task type."""
         field = TaskTypeField(task_type_id=task_type_id, **kwargs)
@@ -78,47 +79,40 @@ class TaskTypeRepository(BaseRepository[TaskType]):
         await self.session.flush()
         await self.session.refresh(field)
         return field
-    
+
     async def update_fields(
-        self, 
-        task_type_id: int, 
-        fields_data: list[dict]
+        self, task_type_id: int, fields_data: list[dict]
     ) -> list[TaskTypeField]:
         """Replace all fields for a task type."""
         from sqlalchemy import delete
+
         await self.session.execute(
-            delete(TaskTypeField).where(
-                TaskTypeField.task_type_id == task_type_id
-            )
+            delete(TaskTypeField).where(TaskTypeField.task_type_id == task_type_id)
         )
-        
+
         fields = []
         for i, field_data in enumerate(fields_data):
-            field = TaskTypeField(
-                task_type_id=task_type_id,
-                order=i,
-                **field_data
-            )
+            field = TaskTypeField(task_type_id=task_type_id, order=i, **field_data)
             self.session.add(field)
             fields.append(field)
-        
+
         await self.session.flush()
         return fields
 
 
 class TaskRepository(BaseRepository[Task]):
     """Repository for Task entity operations."""
-    
+
     def __init__(self, session: AsyncSession):
         super().__init__(Task, session)
-    
+
     async def get_next_display_id(self) -> str:
         """Generate the next display ID for a task."""
         query = select(func.max(Task.id))
         result = await self.session.execute(query)
         max_id = result.scalar_one() or 0
         return f"{settings.TASK_ID_PREFIX}-{max_id + 1}"
-    
+
     async def get_by_display_id(self, display_id: str) -> Task | None:
         """Get a task by display ID."""
         query = (
@@ -136,7 +130,7 @@ class TaskRepository(BaseRepository[Task]):
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
-    
+
     async def get_with_relations(self, id: int) -> Task | None:
         """Get a task with all relations eagerly loaded."""
         query = (
@@ -154,7 +148,7 @@ class TaskRepository(BaseRepository[Task]):
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
-    
+
     async def get_all_filtered(
         self,
         skip: int = 0,
@@ -166,38 +160,35 @@ class TaskRepository(BaseRepository[Task]):
         statuses: list[str] | None = None,
     ) -> Sequence[Task]:
         """Get tasks with optional filtering."""
-        query = (
-            select(Task)
-            .options(
-                selectinload(Task.team),
-                selectinload(Task.task_type),
-                selectinload(Task.project),
-                selectinload(Task.release),
-                selectinload(Task.github_links),
-                selectinload(Task.dependencies),
-                selectinload(Task.dependents),
-            )
+        query = select(Task).options(
+            selectinload(Task.team),
+            selectinload(Task.task_type),
+            selectinload(Task.project),
+            selectinload(Task.release),
+            selectinload(Task.github_links),
+            selectinload(Task.dependencies),
+            selectinload(Task.dependents),
         )
-        
+
         if team_id:
             query = query.where(Task.team_id == team_id)
-        
+
         if task_type_id:
             query = query.where(Task.task_type_id == task_type_id)
-        
+
         if project_id:
             query = query.where(Task.project_id == project_id)
-        
+
         if release_id:
             query = query.where(Task.release_id == release_id)
-        
+
         if statuses:
             query = query.where(Task.status.in_(statuses))
-        
+
         query = query.order_by(Task.updated_at.desc()).offset(skip).limit(limit)
         result = await self.session.execute(query)
         return result.scalars().all()
-    
+
     async def count_filtered(
         self,
         team_id: int | None = None,
@@ -208,29 +199,31 @@ class TaskRepository(BaseRepository[Task]):
     ) -> int:
         """Count tasks with optional filtering."""
         query = select(func.count()).select_from(Task)
-        
+
         if team_id:
             query = query.where(Task.team_id == team_id)
-        
+
         if task_type_id:
             query = query.where(Task.task_type_id == task_type_id)
-        
+
         if project_id:
             query = query.where(Task.project_id == project_id)
-        
+
         if release_id:
             query = query.where(Task.release_id == release_id)
-        
+
         if statuses:
             query = query.where(Task.status.in_(statuses))
-        
+
         result = await self.session.execute(query)
         return result.scalar_one()
-    
-    async def update_project_for_tasks(self, current_project_id: int, new_project_id: int | None) -> int:
+
+    async def update_project_for_tasks(
+        self, current_project_id: int, new_project_id: int | None
+    ) -> int:
         """Update project_id for all tasks of a project. Returns count of updated tasks."""
         from sqlalchemy import update
-        
+
         query = (
             update(Task)
             .where(Task.project_id == current_project_id)
@@ -239,7 +232,7 @@ class TaskRepository(BaseRepository[Task]):
         result = await self.session.execute(query)
         await self.session.flush()
         return result.rowcount
-    
+
     async def add_dependency(self, task_id: int, depends_on_id: int) -> None:
         """Add a dependency to a task."""
         task = await self.get_by_id(task_id, [Task.dependencies])
@@ -248,7 +241,7 @@ class TaskRepository(BaseRepository[Task]):
             if depends_on and depends_on not in task.dependencies:
                 task.dependencies.append(depends_on)
                 await self.session.flush()
-    
+
     async def remove_dependency(self, task_id: int, depends_on_id: int) -> None:
         """Remove a dependency from a task."""
         task = await self.get_by_id(task_id, [Task.dependencies])
@@ -261,21 +254,18 @@ class TaskRepository(BaseRepository[Task]):
 
 class GitHubLinkRepository(BaseRepository[GitHubLink]):
     """Repository for GitHubLink entity operations."""
-    
+
     def __init__(self, session: AsyncSession):
         super().__init__(GitHubLink, session)
-    
+
     async def get_by_task(self, task_id: int) -> Sequence[GitHubLink]:
         """Get all GitHub links for a task."""
         query = select(GitHubLink).where(GitHubLink.task_id == task_id)
         result = await self.session.execute(query)
         return result.scalars().all()
-    
+
     async def get_by_pr(
-        self, 
-        repository_owner: str, 
-        repository_name: str, 
-        pr_number: int
+        self, repository_owner: str, repository_name: str, pr_number: int
     ) -> GitHubLink | None:
         """Get a GitHub link by PR details."""
         query = select(GitHubLink).where(

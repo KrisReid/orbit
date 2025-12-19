@@ -1,6 +1,7 @@
 """
 Task management API endpoints.
 """
+
 from typing import List
 
 from fastapi import APIRouter, HTTPException, status, Query
@@ -110,17 +111,17 @@ async def update_task(
     _: CurrentUser,
 ):
     """Update a task.
-    
+
     Note: To unlink a task from a project/release, explicitly set the field to null.
     This is different from not providing the field at all.
     """
     try:
         service = TaskService(db)
-        
+
         # Build update kwargs only from fields that were explicitly provided
         # This allows distinguishing between "not provided" and "explicitly null"
         update_kwargs: dict = {"task_id": task_id}
-        
+
         if "title" in data.model_fields_set:
             update_kwargs["title"] = data.title
         if "description" in data.model_fields_set:
@@ -141,7 +142,7 @@ async def update_task(
             update_kwargs["estimation"] = data.estimation
         if "custom_data" in data.model_fields_set:
             update_kwargs["custom_data"] = data.custom_data
-        
+
         return await service.update_task(**update_kwargs)
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

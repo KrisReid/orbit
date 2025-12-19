@@ -3,6 +3,7 @@ Database seeding script for development data.
 
 Run with: python -m app.scripts.seed
 """
+
 import asyncio
 
 from app.core.database import get_db_context, init_db
@@ -27,17 +28,18 @@ async def seed_database():
     # Ensure tables exist
     print("📦 Ensuring database tables exist...")
     await init_db()
-    
+
     async with get_db_context() as db:
         print("🌱 Seeding database...")
-        
+
         # Check if already seeded
         from sqlalchemy import select
+
         result = await db.execute(select(User).limit(1))
         if result.scalar_one_or_none():
             print("⚠️  Database already seeded. Skipping.")
             return
-        
+
         # =================================================================
         # Users
         # =================================================================
@@ -65,7 +67,7 @@ async def seed_database():
         )
         db.add_all([admin, user1, user2])
         await db.flush()
-        
+
         # =================================================================
         # Teams
         # =================================================================
@@ -82,15 +84,17 @@ async def seed_database():
         )
         db.add_all([team_platform, team_frontend])
         await db.flush()
-        
+
         # Add members to teams
-        db.add_all([
-            TeamMember(team_id=team_platform.id, user_id=admin.id),
-            TeamMember(team_id=team_platform.id, user_id=user1.id),
-            TeamMember(team_id=team_frontend.id, user_id=user2.id),
-        ])
+        db.add_all(
+            [
+                TeamMember(team_id=team_platform.id, user_id=admin.id),
+                TeamMember(team_id=team_platform.id, user_id=user1.id),
+                TeamMember(team_id=team_frontend.id, user_id=user2.id),
+            ]
+        )
         await db.flush()
-        
+
         # =================================================================
         # Themes
         # =================================================================
@@ -107,7 +111,7 @@ async def seed_database():
         )
         db.add_all([theme_q4, theme_ux])
         await db.flush()
-        
+
         # =================================================================
         # Project Types
         # =================================================================
@@ -135,7 +139,7 @@ async def seed_database():
         )
         db.add_all([pt_feature, pt_improvement, pt_tech_debt])
         await db.flush()
-        
+
         # =================================================================
         # Projects
         # =================================================================
@@ -163,7 +167,7 @@ async def seed_database():
         )
         db.add_all([project1, project2, project3])
         await db.flush()
-        
+
         # =================================================================
         # Task Types
         # =================================================================
@@ -194,7 +198,7 @@ async def seed_database():
         )
         db.add_all([tt_story, tt_bug, tt_task])
         await db.flush()
-        
+
         # =================================================================
         # Releases
         # =================================================================
@@ -219,7 +223,7 @@ async def seed_database():
         )
         db.add_all([release1, release2, release3])
         await db.flush()
-        
+
         # =================================================================
         # Tasks
         # =================================================================
@@ -280,16 +284,16 @@ async def seed_database():
                 estimation="8",
             ),
         ]
-        
+
         # Add task dependency (CORE-5 depends on CORE-4)
         # We do this BEFORE adding to session/flushing to avoid async loading issues
         task4 = tasks[3]
         task5 = tasks[4]
         task5.dependencies.append(task4)
-        
+
         db.add_all(tasks)
         await db.flush()
-        
+
         print("✅ Database seeded successfully!")
         print("\n📋 Test credentials:")
         print("   Email: admin@orbit.example.com")
@@ -298,4 +302,3 @@ async def seed_database():
 
 if __name__ == "__main__":
     asyncio.run(seed_database())
-    

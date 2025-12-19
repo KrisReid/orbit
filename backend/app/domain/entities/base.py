@@ -1,6 +1,7 @@
 """
 SQLAlchemy model base and common utilities.
 """
+
 from datetime import datetime
 from enum import Enum as PyEnum
 
@@ -8,10 +9,9 @@ from sqlalchemy import DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-
 class TimestampMixin:
     """Mixin that adds created_at and updated_at columns."""
-    
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -27,12 +27,14 @@ class TimestampMixin:
 
 class UserRole(str, PyEnum):
     """User roles for authorization."""
+
     ADMIN = "admin"
     USER = "user"
 
 
 class ReleaseStatus(str, PyEnum):
     """Release lifecycle statuses."""
+
     PLANNED = "planned"
     IN_PROGRESS = "in_progress"
     RELEASED = "released"
@@ -41,6 +43,7 @@ class ReleaseStatus(str, PyEnum):
 
 class FieldType(str, PyEnum):
     """Custom field types."""
+
     TEXT = "text"
     TEXTAREA = "textarea"
     NUMBER = "number"
@@ -53,6 +56,7 @@ class FieldType(str, PyEnum):
 
 class GitHubLinkType(str, PyEnum):
     """Types of GitHub links."""
+
     PULL_REQUEST = "pull_request"
     BRANCH = "branch"
     COMMIT = "commit"
@@ -60,6 +64,7 @@ class GitHubLinkType(str, PyEnum):
 
 class GitHubPRStatus(str, PyEnum):
     """GitHub PR statuses."""
+
     OPEN = "open"
     CLOSED = "closed"
     MERGED = "merged"

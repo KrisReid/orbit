@@ -1,6 +1,7 @@
 """
 Authentication API endpoints.
 """
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import DbSession, CurrentUser
@@ -18,7 +19,7 @@ async def login(
 ):
     """
     Authenticate user and return access token.
-    
+
     Use these credentials for the seeded test user:
     - email: admin@orbit.example.com
     - password: admin123

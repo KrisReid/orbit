@@ -1,10 +1,15 @@
 """
 Team management API endpoints.
 """
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import DbSession, CurrentUser, CurrentAdmin
-from app.domain.exceptions import EntityNotFoundError, EntityAlreadyExistsError, ValidationError
+from app.domain.exceptions import (
+    EntityNotFoundError,
+    EntityAlreadyExistsError,
+    ValidationError,
+)
 from app.domain.services import TeamService
 from app.schemas import (
     TeamCreate,
@@ -117,7 +122,7 @@ async def delete_team(
 ):
     """
     Delete a team. Admin only.
-    
+
     Args:
         team_id: ID of the team to delete
         reassign_tasks_to: Team ID to reassign tasks to (optional)

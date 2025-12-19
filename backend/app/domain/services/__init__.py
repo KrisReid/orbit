@@ -3,6 +3,7 @@ Service package.
 
 Exports all service classes for dependency injection.
 """
+
 from app.domain.services.auth import AuthService, UserService
 from app.domain.services.team import TeamService
 from app.domain.services.theme import ThemeService

@@ -4,6 +4,7 @@ Database configuration and session management.
 Provides async SQLAlchemy engine and session factory with proper
 connection pooling and lifecycle management.
 """
+
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -37,7 +38,7 @@ Base = declarative_base()
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     Dependency that provides a database session.
-    
+
     Yields a session that is automatically closed after use.
     Use with FastAPI's Depends() for automatic injection.
     """
@@ -56,7 +57,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def get_db_context() -> AsyncGenerator[AsyncSession, None]:
     """
     Context manager for database sessions outside of request context.
-    
+
     Useful for background tasks, CLI commands, and testing.
     """
     async with AsyncSessionLocal() as session:
@@ -74,9 +75,17 @@ async def init_db() -> None:
     """Initialize database tables."""
     # Import all models to register them with Base.metadata
     from app.domain.entities import (  # noqa: F401
-        User, Team, TeamMember, Theme, ProjectType, Project,
-        TaskType, Task, Release,
+        User,
+        Team,
+        TeamMember,
+        Theme,
+        ProjectType,
+        Project,
+        TaskType,
+        Task,
+        Release,
     )
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

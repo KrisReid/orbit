@@ -1,6 +1,7 @@
 """
 Theme management API endpoints.
 """
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import DbSession, CurrentUser, CurrentAdmin
@@ -121,4 +122,6 @@ async def transition_theme_status(
     """
     service = ThemeService(db)
     count = await service.transition_status(old_status, new_status)
-    return MessageResponse(message=f"Transitioned {count} theme(s) from '{old_status}' to '{new_status}'")
+    return MessageResponse(
+        message=f"Transitioned {count} theme(s) from '{old_status}' to '{new_status}'"
+    )

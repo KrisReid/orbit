@@ -1,6 +1,7 @@
 """
 Project management API endpoints.
 """
+
 from typing import List
 
 from fastapi import APIRouter, HTTPException, status, Query
@@ -90,20 +91,20 @@ async def update_project(
     _: CurrentUser,
 ):
     """Update a project.
-    
+
     Note: To unlink a project from a theme, explicitly set theme_id to null.
     This is different from not providing the field at all.
-    
+
     Note: Changing project_type_id will reset status to first workflow state
     and clear all custom_data.
     """
     try:
         service = ProjectService(db)
-        
+
         # Build update kwargs only from fields that were explicitly provided
         # This allows distinguishing between "not provided" and "explicitly null"
         update_kwargs: dict = {"project_id": project_id}
-        
+
         if "title" in data.model_fields_set:
             update_kwargs["title"] = data.title
         if "description" in data.model_fields_set:
@@ -118,7 +119,7 @@ async def update_project(
             update_kwargs["custom_data"] = data.custom_data
         if "project_type_id" in data.model_fields_set:
             update_kwargs["project_type_id"] = data.project_type_id
-        
+
         return await service.update_project(**update_kwargs)
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
@@ -146,10 +147,13 @@ async def delete_project(
     project_id: int,
     db: DbSession,
     _: CurrentAdmin,
-    target_project_id: int | None = Query(None, description="Project ID to move tasks to. If not provided, tasks will be disassociated."),
+    target_project_id: int | None = Query(
+        None,
+        description="Project ID to move tasks to. If not provided, tasks will be disassociated.",
+    ),
 ):
     """Delete a project. Admin only.
-    
+
     Tasks associated with this project can be:
     - Moved to another project (if target_project_id is provided)
     - Disassociated from any project (if target_project_id is not provided)
@@ -164,7 +168,9 @@ async def delete_project(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.post("/{project_id}/dependencies/{depends_on_id}", response_model=ProjectDetailResponse)
+@router.post(
+    "/{project_id}/dependencies/{depends_on_id}", response_model=ProjectDetailResponse
+)
 async def add_project_dependency(
     project_id: int,
     depends_on_id: int,
@@ -181,7 +187,9 @@ async def add_project_dependency(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.delete("/{project_id}/dependencies/{depends_on_id}", response_model=ProjectDetailResponse)
+@router.delete(
+    "/{project_id}/dependencies/{depends_on_id}", response_model=ProjectDetailResponse
+)
 async def remove_project_dependency(
     project_id: int,
     depends_on_id: int,

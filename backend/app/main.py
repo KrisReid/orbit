@@ -3,6 +3,7 @@ Orbit - FastAPI Application
 
 An open-source, engineer-friendly project management tool.
 """
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status

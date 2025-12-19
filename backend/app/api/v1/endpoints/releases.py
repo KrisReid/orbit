@@ -1,6 +1,7 @@
 """
 Release management API endpoints.
 """
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import DbSession, CurrentUser, CurrentAdmin

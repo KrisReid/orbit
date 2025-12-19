@@ -3,6 +3,7 @@ API dependencies for dependency injection.
 
 Provides common dependencies like database session and current user.
 """
+
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
@@ -24,19 +25,19 @@ async def get_current_user(
 ) -> User:
     """
     Get the current authenticated user from JWT token.
-    
+
     Raises HTTPException if token is invalid or user not found.
     """
     token = credentials.credentials
     payload = decode_token(token)
-    
+
     if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(
@@ -44,7 +45,7 @@ async def get_current_user(
             detail="Invalid token payload",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     try:
         auth_service = AuthService(db)
         user = await auth_service.get_current_user(int(user_id))
@@ -62,7 +63,7 @@ async def get_current_admin(
 ) -> User:
     """
     Verify current user is an admin.
-    
+
     Raises HTTPException if user is not an admin.
     """
     if current_user.role != UserRole.ADMIN:

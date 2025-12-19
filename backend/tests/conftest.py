@@ -4,6 +4,7 @@ Pytest configuration and fixtures for backend tests.
 Provides shared fixtures for database sessions, test client, and common test data.
 Uses the same PostgreSQL database as production for integration tests (with rollback).
 """
+
 import os
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
@@ -16,14 +17,25 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.database import Base, get_db
 from app.core.security import get_password_hash, create_access_token
-from app.domain.entities import User, UserRole, Team, ProjectType, TaskType, Project, Theme, Task
+from app.domain.entities import (
+    User,
+    UserRole,
+    Team,
+    ProjectType,
+    TaskType,
+    Project,
+    Theme,
+    Task,
+)
 from app.main import app
 
 
 # Test database URL - uses same PostgreSQL but with test database
 # Can be overridden with TEST_DATABASE_URL environment variable
 # Default uses orbit credentials from docker-compose
-DEFAULT_TEST_DB_URL = "postgresql+asyncpg://orbit:orbit_secret@localhost:5432/orbit_test"
+DEFAULT_TEST_DB_URL = (
+    "postgresql+asyncpg://orbit:orbit_secret@localhost:5432/orbit_test"
+)
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DB_URL)
 
 
@@ -33,7 +45,7 @@ def _check_database_available() -> bool:
     import asyncio
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import create_async_engine
-    
+
     async def _check():
         try:
             engine = create_async_engine(TEST_DATABASE_URL, pool_pre_ping=True)
@@ -43,7 +55,7 @@ def _check_database_available() -> bool:
             return True
         except Exception:
             return False
-    
+
     try:
         # Create a new event loop for the check
         loop = asyncio.new_event_loop()
@@ -59,8 +71,7 @@ DATABASE_AVAILABLE = _check_database_available()
 
 # Skip marker for integration tests when database is unavailable
 requires_db = pytest.mark.skipif(
-    not DATABASE_AVAILABLE,
-    reason="Database not available - skipping integration tests"
+    not DATABASE_AVAILABLE, reason="Database not available - skipping integration tests"
 )
 
 
@@ -69,11 +80,12 @@ def _setup_database():
     """Create database tables using sync engine."""
     if not DATABASE_AVAILABLE:
         return
-    
+
     # Convert async URL to sync URL for initial setup
     sync_url = TEST_DATABASE_URL.replace("+asyncpg", "")
-    
+
     from sqlalchemy import create_engine
+
     engine = create_engine(sync_url)
     Base.metadata.create_all(engine)
     engine.dispose()
@@ -83,10 +95,11 @@ def _teardown_database():
     """Drop database tables using sync engine."""
     if not DATABASE_AVAILABLE:
         return
-    
+
     sync_url = TEST_DATABASE_URL.replace("+asyncpg", "")
-    
+
     from sqlalchemy import create_engine
+
     engine = create_engine(sync_url)
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -108,19 +121,19 @@ def cleanup_database():
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """
     Create async test database session with transaction rollback.
-    
+
     Each test runs in its own transaction that is rolled back,
     ensuring test isolation without database cleanup overhead.
     """
     if not DATABASE_AVAILABLE:
         pytest.skip("Database not available")
-    
+
     engine = create_async_engine(
         TEST_DATABASE_URL,
         echo=False,
         pool_pre_ping=True,
     )
-    
+
     async_session_factory = async_sessionmaker(
         engine,
         class_=AsyncSession,
@@ -128,21 +141,22 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         autocommit=False,
         autoflush=False,
     )
-    
+
     async with async_session_factory() as session:
         async with session.begin():
             yield session
             await session.rollback()
-    
+
     await engine.dispose()
 
 
 @pytest_asyncio.fixture(scope="function")
 async def test_app(db_session: AsyncSession) -> FastAPI:
     """Create test FastAPI application with overridden dependencies."""
+
     async def override_get_db():
         yield db_session
-    
+
     app.dependency_overrides[get_db] = override_get_db
     yield app
     app.dependency_overrides.clear()
@@ -157,6 +171,7 @@ async def client(test_app: FastAPI) -> AsyncGenerator[AsyncClient, None]:
 
 
 # --- Test Data Fixtures ---
+
 
 @pytest_asyncio.fixture
 async def test_user(db_session: AsyncSession) -> User:
@@ -270,9 +285,7 @@ async def test_theme(db_session: AsyncSession) -> Theme:
 
 @pytest_asyncio.fixture
 async def test_project(
-    db_session: AsyncSession,
-    test_project_type: ProjectType,
-    test_theme: Theme
+    db_session: AsyncSession, test_project_type: ProjectType, test_theme: Theme
 ) -> Project:
     """Create a test project."""
     project = Project(
@@ -293,7 +306,7 @@ async def test_task(
     db_session: AsyncSession,
     test_team: Team,
     test_task_type: TaskType,
-    test_project: Project
+    test_project: Project,
 ) -> Task:
     """Create a test task."""
     task = Task(
@@ -312,6 +325,7 @@ async def test_task(
 
 
 # --- Authentication Fixtures ---
+
 
 @pytest.fixture
 def user_token(test_user: User) -> str:
@@ -338,6 +352,7 @@ def admin_headers(admin_token: str) -> dict:
 
 
 # --- Mock Fixtures for Unit Tests ---
+
 
 @pytest.fixture
 def mock_session() -> AsyncMock:

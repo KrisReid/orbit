@@ -1,6 +1,7 @@
 """
 Task type management API endpoints.
 """
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import DbSession, CurrentUser, CurrentAdmin
@@ -49,7 +50,7 @@ async def create_task_type(
     _: CurrentAdmin,
 ):
     """Create a new task type. Admin only.
-    
+
     The team_id is now included in the request body.
     """
     try:
@@ -58,7 +59,7 @@ async def create_task_type(
         fields = None
         if data.fields:
             fields = [f.model_dump() for f in data.fields]
-        
+
         task_type = await service.create_task_type(
             name=data.name,
             team_id=data.team_id,
@@ -101,7 +102,7 @@ async def update_task_type(
         fields = None
         if data.fields:
             fields = [f.model_dump() for f in data.fields]
-        
+
         return await service.update_task_type(
             task_type_id=task_type_id,
             name=data.name,
@@ -171,14 +172,16 @@ async def transition_task_status(
     _: CurrentAdmin,
 ):
     """Transition all tasks from one status to another within this task type.
-    
+
     Used when removing a status from the workflow - all tasks with that status
     need to be moved to a different status first. Admin only.
     """
     try:
         service = TaskTypeService(db)
         count = await service.transition_status(task_type_id, old_status, new_status)
-        return MessageResponse(message=f"Successfully transitioned {count} tasks from '{old_status}' to '{new_status}'.")
+        return MessageResponse(
+            message=f"Successfully transitioned {count} tasks from '{old_status}' to '{new_status}'."
+        )
     except EntityNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
