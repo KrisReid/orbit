@@ -83,7 +83,15 @@ describe('useAuthStore', () => {
     it('should clear user and authentication state', () => {
       // Set up authenticated state
       useAuthStore.setState({
-        user: { id: 1, email: 'test@example.com' } as any,
+        user: {
+          id: 1,
+          email: 'test@example.com',
+          full_name: 'Test User',
+          role: 'user' as const,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
         isAuthenticated: true,
       });
 

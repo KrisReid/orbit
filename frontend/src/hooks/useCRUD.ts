@@ -1,10 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { UseCRUDOptions, UseCRUDReturn } from './types';
 
-/**
- * Hook for common CRUD operations with React Query
- * Provides standardized mutations with automatic cache invalidation
- */
 export function useCRUD<T, CreateData = Partial<T>, UpdateData = Partial<T>>({
   queryKey,
   listFn,
@@ -17,52 +13,45 @@ export function useCRUD<T, CreateData = Partial<T>, UpdateData = Partial<T>>({
 }: UseCRUDOptions<T, CreateData, UpdateData>): UseCRUDReturn<T, CreateData, UpdateData> {
   const queryClient = useQueryClient();
 
-  // List query
   const { data, isLoading, error, refetch } = useQuery({
     queryKey,
     queryFn: listFn,
   });
 
-  // Create mutation
-  const createMutation = createFn
-    ? useMutation({
-        mutationFn: createFn,
-        onSuccess: (data) => {
-          queryClient.invalidateQueries({ queryKey });
-          onCreateSuccess?.(data);
-        },
-      })
-    : null;
+  // Always call hooks unconditionally
+  const createMutation = useMutation({
+    mutationFn: createFn ?? (() => Promise.reject(new Error('Create not supported'))),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey });
+      onCreateSuccess?.(data);
+    },
+  });
 
-  // Update mutation
-  const updateMutation = updateFn
-    ? useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateData }) => updateFn(id, data),
-        onSuccess: (data) => {
-          queryClient.invalidateQueries({ queryKey });
-          onUpdateSuccess?.(data);
-        },
-      })
-    : null;
+  const updateMutation = useMutation({
+    mutationFn: updateFn
+      ? ({ id, data }: { id: number; data: UpdateData }) => updateFn(id, data)
+      : () => Promise.reject(new Error('Update not supported')),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey });
+      onUpdateSuccess?.(data);
+    },
+  });
 
-  // Delete mutation
-  const deleteMutation = deleteFn
-    ? useMutation({
-        mutationFn: deleteFn,
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey });
-          onDeleteSuccess?.();
-        },
-      })
-    : null;
+  const deleteMutation = useMutation({
+    mutationFn: deleteFn ?? (() => Promise.reject(new Error('Delete not supported'))),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      onDeleteSuccess?.();
+    },
+  });
 
   return {
     items: data?.items ?? [],
     isLoading,
     error: error as Error | null,
-    createMutation,
-    updateMutation,
-    deleteMutation,
+    createMutation: createFn ? createMutation : null,
+    updateMutation: updateFn ? updateMutation : null,
+    deleteMutation: deleteFn ? deleteMutation : null,
     refetch,
   };
 }

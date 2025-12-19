@@ -777,7 +777,7 @@ function InlineCustomFields({
             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
           </div>
         );
-      case 'multiselect':
+      case 'multiselect': {
         const selectedValues = Array.isArray(value) ? value : [];
         return (
           <div className="space-y-2 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
@@ -800,6 +800,7 @@ function InlineCustomFields({
             ))}
           </div>
         );
+      }
       case 'url':
         return (
           <UrlFieldWithLink
