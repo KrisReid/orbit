@@ -1,0 +1,73 @@
+# =============================================================================
+# Production Environment Values
+# =============================================================================
+# These values override defaults for production deployments.
+# =============================================================================
+
+backend:
+  replicaCount: 2
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  env:
+    DEBUG: "false"
+
+frontend:
+  replicaCount: 2
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+ingress:
+  enabled: true
+  className: nginx
+  host: orbit.example.com  # Override this!
+  
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  
+  tls:
+    enabled: true
+    secretName: orbit-tls
+
+postgresql:
+  enabled: true
+  primary:
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

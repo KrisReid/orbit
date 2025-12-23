@@ -1,0 +1,35 @@
+# =============================================================================
+# Orbit Helm Chart
+# =============================================================================
+# A Helm chart for deploying Orbit to Kubernetes.
+#
+# Usage:
+#   helm install orbit ./helm/orbit -f values.yaml
+# =============================================================================
+
+apiVersion: v2
+name: orbit
+description: A project management tool for software teams
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+keywords:
+  - project-management
+  - agile
+  - kanban
+  - task-tracking
+
+home: https://github.com/your-org/orbit
+sources:
+  - https://github.com/your-org/orbit
+
+maintainers:
+  - name: Orbit Team
+    email: team@orbit.example.com
+
+dependencies:
+  - name: postgresql
+    version: "15.5.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled

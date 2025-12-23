@@ -1,0 +1,52 @@
+
+╔═══════════════════════════════════════════════════════════════════╗
+║                         🚀 Orbit Deployed!                        ║
+╚═══════════════════════════════════════════════════════════════════╝
+
+{{- if .Values.ingress.enabled }}
+
+Access Orbit at:
+{{- if .Values.ingress.tls.enabled }}
+  https://{{ .Values.ingress.host }}
+{{- else }}
+  http://{{ .Values.ingress.host }}
+{{- end }}
+
+{{- else }}
+
+Get the application URL by running:
+
+  # Frontend
+  kubectl port-forward svc/{{ include "orbit.fullname" . }}-frontend 8080:{{ .Values.frontend.service.port }}
+  
+  # Then open: http://localhost:8080
+
+{{- end }}
+
+Default credentials:
+  Email:    admin@orbit.example.com
+  Password: admin123
+
+⚠️  Change the default password after first login!
+
+Useful commands:
+
+  # Check pod status
+  kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+  # View backend logs
+  kubectl logs -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=backend -f
+
+  # View frontend logs
+  kubectl logs -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/component=frontend -f
+
+{{- if .Values.postgresql.enabled }}
+
+  # Connect to PostgreSQL
+  kubectl exec -it $(kubectl get pods -l app.kubernetes.io/name=postgresql -o jsonpath='{.items[0].metadata.name}') -- psql -U {{ .Values.postgresql.auth.username }} -d {{ .Values.postgresql.auth.database }}
+
+{{- end }}
+
+Documentation:
+  https://github.com/your-org/orbit/blob/main/docs/SELF-HOSTING.md
+

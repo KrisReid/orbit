@@ -1,0 +1,28 @@
+# Patterns to ignore when building packages.
+.DS_Store
+.git/
+.gitignore
+.idea/
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.project
+.settings/
+*.tmproj
+.vscode/
+
+# Testing
+tests/
+*_test.yaml
+
+# CI files
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Documentation
+*.md
+LICENSE

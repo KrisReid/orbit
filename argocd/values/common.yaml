@@ -1,0 +1,26 @@
+# =============================================================================
+# Common Helm Values for ArgoCD Deployments
+# =============================================================================
+# These values are shared across all environments.
+# Environment-specific values should be placed in the overlay values files.
+# =============================================================================
+
+# Use image tags from GHCR
+backend:
+  image:
+    repository: ghcr.io/your-org/orbit-backend
+    pullPolicy: IfNotPresent
+
+frontend:
+  image:
+    repository: ghcr.io/your-org/orbit-frontend
+    pullPolicy: IfNotPresent
+
+# Enable ingress by default
+ingress:
+  enabled: true
+  className: nginx
+
+# Service account
+serviceAccount:
+  create: true

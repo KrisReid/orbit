@@ -1,0 +1,54 @@
+# =============================================================================
+# Orbit ArgoCD Application
+# =============================================================================
+# This defines the ArgoCD Application for deploying Orbit via GitOps.
+#
+# Apply with:
+#   kubectl apply -f argocd/base/application.yaml
+#
+# Or use the overlay for your environment:
+#   kustomize build argocd/overlays/production | kubectl apply -f -
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orbit
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/your-org/orbit.git
+    targetRevision: HEAD
+    path: helm/orbit
+
+    helm:
+      releaseName: orbit
+      valueFiles:
+        - values.yaml
+        - ../../argocd/values/common.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: orbit
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  revisionHistoryLimit: 10

@@ -7,6 +7,8 @@ This guide covers deploying Orbit for your organization. Choose the deployment m
 - [Quick Start](#quick-start)
 - [Deployment Options](#deployment-options)
 - [Docker Compose Deployment](#docker-compose-deployment)
+- [Kubernetes Deployment (Helm)](#kubernetes-deployment-helm)
+- [GitOps Deployment (ArgoCD)](#gitops-deployment-argocd)
 - [Configuration Reference](#configuration-reference)
 - [TLS/HTTPS Setup](#tlshttps-setup)
 - [Database Management](#database-management)
@@ -155,6 +157,294 @@ curl http://localhost/health
 │                                 └─────────────┘           │
 │                                                             │
 └────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Kubernetes Deployment (Helm)
+
+For production deployments requiring high availability, scalability, and enterprise features.
+
+### Prerequisites
+
+- **Kubernetes:** 1.25+ (EKS, GKE, AKS, or self-managed)
+- **Helm:** 3.10+
+- **kubectl:** Configured with cluster access
+- **Ingress Controller:** nginx-ingress or Traefik
+- **cert-manager:** (Optional) For automatic TLS
+
+### Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/orbit.git
+cd orbit
+
+# Add Bitnami repo for PostgreSQL dependency
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+# Update Helm dependencies
+helm dependency update helm/orbit
+
+# Install Orbit
+helm install orbit helm/orbit \
+  --namespace orbit \
+  --create-namespace \
+  --set ingress.host=orbit.yourcompany.com \
+  --set postgresql.auth.password=your-secure-password \
+  --set backend.secrets.secretKey=your-secret-key
+```
+
+### Custom Values File
+
+Create a `my-values.yaml` for your environment:
+
+```yaml
+# my-values.yaml
+backend:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/your-org/orbit-backend
+    tag: "1.0.0"
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/your-org/orbit-frontend
+    tag: "1.0.0"
+
+ingress:
+  enabled: true
+  className: nginx
+  host: orbit.yourcompany.com
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  tls:
+    enabled: true
+    secretName: orbit-tls
+
+postgresql:
+  enabled: true
+  auth:
+    password: "your-secure-db-password"
+  primary:
+    persistence:
+      size: 20Gi
+```
+
+Install with custom values:
+
+```bash
+helm install orbit helm/orbit \
+  --namespace orbit \
+  --create-namespace \
+  -f my-values.yaml
+```
+
+### Using External Database
+
+To use an existing PostgreSQL (RDS, CloudSQL, etc.):
+
+```yaml
+# my-values.yaml
+postgresql:
+  enabled: false
+
+externalDatabase:
+  enabled: true
+  host: your-db-host.rds.amazonaws.com
+  port: 5432
+  database: orbit
+  username: orbit
+  existingSecret: orbit-db-credentials
+  existingSecretPasswordKey: password
+```
+
+Create the database secret:
+
+```bash
+kubectl create secret generic orbit-db-credentials \
+  --namespace orbit \
+  --from-literal=password=your-db-password
+```
+
+### Upgrading
+
+```bash
+# Update to new version
+helm upgrade orbit helm/orbit \
+  --namespace orbit \
+  -f my-values.yaml \
+  --set backend.image.tag=1.1.0 \
+  --set frontend.image.tag=1.1.0
+```
+
+### Rollback
+
+```bash
+# List revision history
+helm history orbit --namespace orbit
+
+# Rollback to previous revision
+helm rollback orbit --namespace orbit
+
+# Rollback to specific revision
+helm rollback orbit 2 --namespace orbit
+```
+
+### Uninstall
+
+```bash
+# Uninstall Orbit (keeps PVCs by default)
+helm uninstall orbit --namespace orbit
+
+# Delete namespace and all resources
+kubectl delete namespace orbit
+```
+
+---
+
+## GitOps Deployment (ArgoCD)
+
+For enterprise teams using GitOps workflows with ArgoCD.
+
+### Prerequisites
+
+- **Kubernetes:** 1.25+
+- **ArgoCD:** 2.8+ installed on the cluster
+- **Git repository:** Fork of Orbit or your own repo
+
+### Setup ArgoCD Application
+
+#### Option 1: Apply directly
+
+```bash
+# Apply the ArgoCD Application
+kubectl apply -f argocd/base/application.yaml
+```
+
+#### Option 2: Using Kustomize overlays
+
+For environment-specific deployments:
+
+```bash
+# Production
+kustomize build argocd/overlays/production | kubectl apply -f -
+
+# Staging
+kustomize build argocd/overlays/staging | kubectl apply -f -
+```
+
+### Configure Values
+
+Edit the values files for your environment:
+
+**Production (`argocd/values/production.yaml`):**
+```yaml
+ingress:
+  host: orbit.yourcompany.com  # <-- Change this
+
+postgresql:
+  auth:
+    existingSecret: orbit-db-credentials  # <-- Create this secret
+```
+
+**Staging (`argocd/values/staging.yaml`):**
+```yaml
+ingress:
+  host: staging.orbit.yourcompany.com  # <-- Change this
+```
+
+### Secrets Management
+
+ArgoCD doesn't sync secrets by default. Use one of these approaches:
+
+**Option A: External Secrets Operator**
+```yaml
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: orbit-secrets
+  namespace: orbit
+spec:
+  secretStoreRef:
+    name: aws-secrets-manager
+    kind: ClusterSecretStore
+  target:
+    name: orbit-backend
+  data:
+    - secretKey: SECRET_KEY
+      remoteRef:
+        key: orbit/production
+        property: secret_key
+```
+
+**Option B: Sealed Secrets**
+```bash
+# Seal your secret
+kubeseal --format yaml < secret.yaml > sealed-secret.yaml
+
+# Add to git repository
+git add sealed-secret.yaml
+git commit -m "Add sealed secrets"
+git push
+```
+
+**Option C: Manual Secret Creation**
+```bash
+kubectl create secret generic orbit-backend \
+  --namespace orbit \
+  --from-literal=SECRET_KEY=$(openssl rand -base64 32)
+```
+
+### GitOps Workflow
+
+1. **Make changes** to values files in git
+2. **Commit and push** to your repository
+3. **ArgoCD detects changes** and syncs automatically (if auto-sync enabled)
+4. **Monitor sync status** in ArgoCD UI or CLI
+
+```bash
+# Check application status
+argocd app get orbit
+
+# Sync manually if needed
+argocd app sync orbit
+
+# View sync history
+argocd app history orbit
+```
+
+### Multi-Environment Setup
+
+```
+argocd/
+├── base/
+│   ├── application.yaml      # Base ArgoCD Application
+│   └── kustomization.yaml
+├── overlays/
+│   ├── production/
+│   │   ├── application-patch.yaml
+│   │   └── kustomization.yaml
+│   └── staging/
+│       ├── application-patch.yaml
+│       └── kustomization.yaml
+└── values/
+    ├── common.yaml           # Shared values
+    ├── production.yaml       # Production overrides
+    └── staging.yaml          # Staging overrides
 ```
 
 ---

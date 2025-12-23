@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orbit
+  namespace: argocd
+spec:
+  source:
+    targetRevision: main  # Use main branch for production
+    helm:
+      valueFiles:
+        - values.yaml
+        - ../../argocd/values/common.yaml
+        - ../../argocd/values/production.yaml
+  destination:
+    namespace: orbit-production

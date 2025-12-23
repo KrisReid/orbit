@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orbit
+  namespace: argocd
+spec:
+  source:
+    targetRevision: develop  # Use develop branch for staging
+    helm:
+      valueFiles:
+        - values.yaml
+        - ../../argocd/values/common.yaml
+        - ../../argocd/values/staging.yaml
+  destination:
+    namespace: orbit-staging
