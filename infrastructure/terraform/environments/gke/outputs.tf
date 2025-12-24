@@ -59,21 +59,40 @@ output "database_private_ip" {
 }
 
 # -----------------------------------------------------------------------------
-# Application Outputs
+# Database Connection Info (for ArgoCD/Helm values)
 # -----------------------------------------------------------------------------
-output "orbit_namespace" {
-  description = "The namespace where Orbit is deployed"
-  value       = module.orbit.namespace
+# These outputs provide the database connection information needed
+# for ArgoCD to configure the Orbit Helm chart with external database settings.
+#
+# Example usage in ArgoCD values:
+#   externalDatabase:
+#     enabled: true
+#     host: <database_host output>
+#     port: 5432
+#     database: <database_name output>
+#     username: <database_user output>
+#     existingSecret: "orbit-db-secret"
+#     existingSecretPasswordKey: "password"
+# -----------------------------------------------------------------------------
+output "database_host" {
+  description = "Database host for Orbit application configuration"
+  value       = module.database.private_ip_address
 }
 
-output "orbit_ingress_host" {
-  description = "The ingress hostname for Orbit"
-  value       = module.orbit.ingress_host
+output "database_name" {
+  description = "Database name for Orbit application"
+  value       = var.database_name
 }
 
-output "orbit_url" {
-  description = "The URL to access Orbit"
-  value       = module.orbit.ingress_url
+output "database_user" {
+  description = "Database username for Orbit application"
+  value       = var.database_user
+}
+
+output "database_password" {
+  description = "Database password (store in Kubernetes secret for ArgoCD)"
+  value       = module.database.database_password
+  sensitive   = true
 }
 
 # -----------------------------------------------------------------------------

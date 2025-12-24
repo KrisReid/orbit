@@ -108,51 +108,19 @@ module "kubernetes_addons" {
 }
 
 # -----------------------------------------------------------------------------
-# Orbit Application
+# Note: Orbit Application Deployment
 # -----------------------------------------------------------------------------
-module "orbit" {
-  source = "../../modules/orbit"
-
-  release_name = var.project_name
-  namespace    = var.orbit_namespace
-  chart_path   = var.orbit_chart_path
-
-  # Backend
-  backend_replica_count    = var.backend_replica_count
-  backend_image_repository = var.backend_image_repository
-  backend_image_tag        = var.backend_image_tag
-  backend_resources        = var.backend_resources
-
-  # Frontend
-  frontend_replica_count    = var.frontend_replica_count
-  frontend_image_repository = var.frontend_image_repository
-  frontend_image_tag        = var.frontend_image_tag
-  frontend_resources        = var.frontend_resources
-
-  # Ingress
-  ingress_enabled         = var.ingress_enabled
-  ingress_class_name      = "nginx"
-  ingress_host            = var.ingress_host
-  ingress_tls_enabled     = var.ingress_tls_enabled
-  ingress_tls_secret_name = var.ingress_tls_secret_name
-  cert_manager_issuer     = var.cert_manager_issuer
-
-  # External Database
-  use_external_database  = true
-  external_database_host = module.database.private_ip_address
-  database_name          = var.database_name
-  database_user          = var.database_user
-  database_password      = module.database.database_password
-
-  # Service Account with Workload Identity
-  create_service_account      = true
-  service_account_annotations = {
-    "iam.gke.io/gcp-service-account" = var.workload_identity_sa
-  }
-
-  depends_on = [
-    module.gke,
-    module.database,
-    module.kubernetes_addons
-  ]
-}
+# The Orbit application is deployed via ArgoCD (GitOps), not Terraform.
+# See infrastructure/argocd/ for application deployment configuration.
+#
+# This Terraform configuration provisions:
+# - VPC networking
+# - GKE cluster
+# - Cloud SQL database
+# - Kubernetes addons (ingress-nginx, cert-manager)
+#
+# ArgoCD deploys:
+# - Orbit Helm chart (backend, frontend, ingress)
+#
+# Database connection info is available via outputs for ArgoCD configuration.
+# -----------------------------------------------------------------------------

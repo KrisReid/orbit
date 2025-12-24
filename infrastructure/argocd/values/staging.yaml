@@ -2,6 +2,18 @@
 # Staging Environment Values
 # =============================================================================
 # These values override defaults for staging deployments.
+#
+# Database Configuration:
+# -----------------------
+# For cloud deployments (GKE/EKS with Terraform), use external database.
+# The database is provisioned by Terraform and connection info is available
+# via Terraform outputs. Create a Kubernetes secret with the database password:
+#
+#   kubectl create secret generic orbit-db-secret \
+#     --namespace orbit-staging \
+#     --from-literal=password=$(terraform output -raw database_password)
+#
+# Then uncomment the externalDatabase section below and set postgresql.enabled: false
 # =============================================================================
 
 backend:
@@ -48,6 +60,10 @@ ingress:
     enabled: true
     secretName: orbit-staging-tls
 
+# -----------------------------------------------------------------------------
+# Database Configuration
+# -----------------------------------------------------------------------------
+# Option 1: Use in-cluster PostgreSQL (default for simple deployments)
 postgresql:
   enabled: true
   primary:
@@ -60,6 +76,17 @@ postgresql:
       limits:
         memory: "512Mi"
         cpu: "500m"
+
+# Option 2: Use external database (Cloud SQL/RDS provisioned by Terraform)
+# Uncomment below and set postgresql.enabled: false
+# externalDatabase:
+#   enabled: true
+#   host: ""      # Set from: terraform output database_host
+#   port: 5432
+#   database: ""  # Set from: terraform output database_name
+#   username: ""  # Set from: terraform output database_user
+#   existingSecret: "orbit-db-secret"
+#   existingSecretPasswordKey: "password"
 
 podDisruptionBudget:
   enabled: false
