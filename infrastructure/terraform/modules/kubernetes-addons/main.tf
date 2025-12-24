@@ -26,7 +26,7 @@ resource "helm_release" "nginx_ingress" {
         resources = var.nginx_resources
 
         service = {
-          type = var.nginx_service_type
+          type        = var.nginx_service_type
           annotations = var.nginx_service_annotations
         }
 
@@ -43,25 +43,20 @@ resource "helm_release" "nginx_ingress" {
           enabled = var.enable_nginx_admission_webhooks
         }
 
-        autoscaling = var.enable_nginx_autoscaling ? {
-          enabled     = true
-          minReplicas = var.nginx_min_replicas
-          maxReplicas = var.nginx_max_replicas
+        autoscaling = {
+          enabled                        = var.enable_nginx_autoscaling
+          minReplicas                    = var.nginx_min_replicas
+          maxReplicas                    = var.nginx_max_replicas
           targetCPUUtilizationPercentage = var.nginx_target_cpu_utilization
-        } : {
-          enabled = false
         }
       }
     })
   ]
 
-  dynamic "set" {
-    for_each = var.nginx_extra_values
-    content {
-      name  = set.key
-      value = set.value
-    }
-  }
+  set = [for k, v in var.nginx_extra_values : {
+    name  = k
+    value = v
+  }]
 
   timeout = var.helm_timeout
 }
@@ -79,10 +74,16 @@ resource "helm_release" "cert_manager" {
   chart            = "cert-manager"
   version          = var.cert_manager_chart_version
 
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
+  set = concat(
+    [{
+      name  = "installCRDs"
+      value = "true"
+    }],
+    [for k, v in var.cert_manager_extra_values : {
+      name  = k
+      value = v
+    }]
+  )
 
   values = [
     yamlencode({
@@ -106,14 +107,6 @@ resource "helm_release" "cert_manager" {
       }
     })
   ]
-
-  dynamic "set" {
-    for_each = var.cert_manager_extra_values
-    content {
-      name  = set.key
-      value = set.value
-    }
-  }
 
   timeout = var.helm_timeout
 
