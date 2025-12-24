@@ -1,0 +1,130 @@
+# =============================================================================
+# Orbit EKS Environment - Example Configuration
+# =============================================================================
+# Copy this file to terraform.tfvars and update with your values.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Required Variables
+# -----------------------------------------------------------------------------
+project_name = "orbit"
+region       = "us-east-1"
+
+# -----------------------------------------------------------------------------
+# VPC Configuration
+# -----------------------------------------------------------------------------
+# vpc_cidr                = "10.0.0.0/16"
+availability_zone_count = 3
+enable_nat_gateway      = true
+single_nat_gateway      = false  # Set to true for cost savings
+enable_vpc_endpoints    = true
+
+# -----------------------------------------------------------------------------
+# EKS Cluster Configuration
+# -----------------------------------------------------------------------------
+kubernetes_version      = "1.28"
+endpoint_private_access = true
+endpoint_public_access  = true
+
+# Uncomment to restrict public access to specific CIDRs
+# public_access_cidrs = ["YOUR_IP/32"]
+
+enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+
+node_groups = {
+  default = {
+    instance_types = ["t3.medium"]
+    capacity_type  = "ON_DEMAND"
+    disk_size      = 50
+    desired_size   = 2
+    min_size       = 1
+    max_size       = 5
+  }
+  # Uncomment for a spot instance node group
+  # spot = {
+  #   instance_types = ["t3.medium", "t3.large"]
+  #   capacity_type  = "SPOT"
+  #   disk_size      = 50
+  #   desired_size   = 0
+  #   min_size       = 0
+  #   max_size       = 10
+  #   taints = [
+  #     {
+  #       key    = "spot"
+  #       value  = "true"
+  #       effect = "NO_SCHEDULE"
+  #     }
+  #   ]
+  # }
+}
+
+# -----------------------------------------------------------------------------
+# Database Configuration
+# -----------------------------------------------------------------------------
+database_engine_version        = "15.4"
+database_instance_class        = "db.t3.small"
+database_multi_az              = true
+database_allocated_storage     = 20
+database_max_allocated_storage = 100
+database_name                  = "orbit"
+database_user                  = "orbit"
+# database_password            = ""  # Leave empty for auto-generation
+
+database_backup_retention_period      = 7
+database_skip_final_snapshot          = false
+database_performance_insights_enabled = true
+
+# -----------------------------------------------------------------------------
+# Kubernetes Addons
+# -----------------------------------------------------------------------------
+enable_nginx_ingress       = true
+nginx_replica_count        = 2
+enable_cert_manager        = true
+create_letsencrypt_issuers = true
+letsencrypt_email          = "admin@example.com"
+
+# -----------------------------------------------------------------------------
+# Orbit Application
+# -----------------------------------------------------------------------------
+orbit_namespace = "orbit"
+# orbit_chart_path = "../../../helm/orbit"
+
+backend_replica_count    = 2
+backend_image_repository = "ghcr.io/your-org/orbit-backend"
+backend_image_tag        = "latest"
+# backend_resources = {
+#   requests = {
+#     memory = "256Mi"
+#     cpu    = "100m"
+#   }
+#   limits = {
+#     memory = "512Mi"
+#     cpu    = "500m"
+#   }
+# }
+
+frontend_replica_count    = 2
+frontend_image_repository = "ghcr.io/your-org/orbit-frontend"
+frontend_image_tag        = "latest"
+
+ingress_enabled         = true
+ingress_host            = "orbit.yourdomain.com"
+ingress_tls_enabled     = true
+ingress_tls_secret_name = "orbit-tls"
+cert_manager_issuer     = "letsencrypt-prod"
+
+# Uncomment if using IAM Roles for Service Accounts
+# irsa_enabled  = true
+# irsa_role_arn = "arn:aws:iam::ACCOUNT_ID:role/orbit-role"
+
+# -----------------------------------------------------------------------------
+# Tags & Protection
+# -----------------------------------------------------------------------------
+tags = {
+  Environment = "production"
+  Application = "orbit"
+  ManagedBy   = "terraform"
+}
+
+# Set to false to allow terraform destroy
+deletion_protection = true

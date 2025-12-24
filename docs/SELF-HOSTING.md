@@ -8,6 +8,7 @@ This guide covers deploying Orbit for your organization. Choose the deployment m
 - [Deployment Options](#deployment-options)
 - [Docker Compose Deployment](#docker-compose-deployment)
 - [Kubernetes Deployment (Helm)](#kubernetes-deployment-helm)
+- [Terraform Deployment (GKE/EKS)](#terraform-deployment-gkeeks)
 - [GitOps Deployment (ArgoCD)](#gitops-deployment-argocd)
 - [Configuration Reference](#configuration-reference)
 - [TLS/HTTPS Setup](#tlshttps-setup)
@@ -49,8 +50,9 @@ Access Orbit at `https://your-domain.com` (or `http://localhost` for local testi
 | Method | Best For | Complexity | High Availability |
 |--------|----------|------------|-------------------|
 | [Docker Compose](#docker-compose-deployment) | Small teams, single server | Low | No |
-| [Kubernetes (Helm)](#kubernetes-deployment) | Medium to large orgs | Medium | Yes |
-| [GitOps (ArgoCD)](#gitops-deployment) | Enterprise, platform teams | High | Yes |
+| [Kubernetes (Helm)](#kubernetes-deployment-helm) | Medium to large orgs | Medium | Yes |
+| [Terraform (GKE/EKS)](#terraform-deployment) | Cloud-native infrastructure | Medium-High | Yes |
+| [GitOps (ArgoCD)](#gitops-deployment-argocd) | Enterprise, platform teams | High | Yes |
 
 ---
 
@@ -313,6 +315,208 @@ helm uninstall orbit --namespace orbit
 # Delete namespace and all resources
 kubectl delete namespace orbit
 ```
+
+---
+
+## Terraform Deployment (GKE/EKS)
+
+For deploying Orbit on Google Kubernetes Engine (GKE) or Amazon Elastic Kubernetes Service (EKS) with complete infrastructure-as-code.
+
+### Prerequisites
+
+**Common:**
+- [Terraform](https://www.terraform.io/downloads) >= 1.5.0
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Helm](https://helm.sh/docs/intro/install/) >= 3.0
+
+**For GKE:**
+- [Google Cloud SDK](https://cloud.google.com/sdk/docs/install)
+- A GCP project with billing enabled
+- Enabled APIs: Kubernetes Engine, Cloud SQL, Compute Engine
+
+**For EKS:**
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- AWS account with appropriate IAM permissions
+
+### Quick Start - GKE
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/orbit.git
+cd orbit/terraform/environments/gke
+
+# Copy and configure variables
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values (project_id, region, etc.)
+
+# Initialize Terraform
+terraform init
+
+# Review the plan
+terraform plan
+
+# Apply the configuration
+terraform apply
+```
+
+### Quick Start - EKS
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/orbit.git
+cd orbit/terraform/environments/eks
+
+# Copy and configure variables
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values (region, etc.)
+
+# Initialize Terraform
+terraform init
+
+# Review the plan
+terraform plan
+
+# Apply the configuration
+terraform apply
+```
+
+### What Gets Created
+
+The Terraform configuration provisions:
+
+| Component | GKE | EKS |
+|-----------|-----|-----|
+| VPC & Networking | VPC, Subnet, Cloud NAT | VPC, Subnets, NAT Gateway |
+| Kubernetes Cluster | GKE (Regional) | EKS |
+| Database | Cloud SQL PostgreSQL | RDS PostgreSQL |
+| Ingress | NGINX Ingress Controller | NGINX Ingress + NLB |
+| TLS | cert-manager + Let's Encrypt | cert-manager + Let's Encrypt |
+| Application | Orbit via Helm | Orbit via Helm |
+
+### Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        Cloud Provider (GCP/AWS)                           │
+│                                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐ │
+│  │                         VPC Network                                  │ │
+│  │                                                                      │ │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │ │
+│  │  │                    Kubernetes Cluster                          │ │ │
+│  │  │                                                                │ │ │
+│  │  │  ┌──────────────────────────────────────────────────────────┐ │ │ │
+│  │  │  │                    Ingress (NGINX)                       │ │ │ │
+│  │  │  │                   + cert-manager                         │ │ │ │
+│  │  │  └────────────────────────┬─────────────────────────────────┘ │ │ │
+│  │  │                           │                                    │ │ │
+│  │  │           ┌───────────────┴───────────────┐                   │ │ │
+│  │  │           │                               │                   │ │ │
+│  │  │           ▼                               ▼                   │ │ │
+│  │  │    ┌─────────────┐                ┌─────────────┐            │ │ │
+│  │  │    │  Frontend   │                │   Backend   │            │ │ │
+│  │  │    │  (nginx)    │                │  (FastAPI)  │            │ │ │
+│  │  │    └─────────────┘                └──────┬──────┘            │ │ │
+│  │  │                                          │                    │ │ │
+│  │  └──────────────────────────────────────────│────────────────────┘ │ │
+│  │                                             │                       │ │
+│  │                                             ▼                       │ │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │ │
+│  │  │              Managed Database (Cloud SQL / RDS)                │ │ │
+│  │  │                       PostgreSQL                                │ │ │
+│  │  └────────────────────────────────────────────────────────────────┘ │ │
+│  └──────────────────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### Configuration Variables
+
+Key variables to configure in `terraform.tfvars`:
+
+```hcl
+# Required
+project_name = "orbit"
+region       = "us-central1"       # GKE: GCP region, EKS: AWS region
+project_id   = "your-gcp-project"  # GKE only
+
+# Cluster
+node_pools = {
+  default = {
+    min_node_count = 1
+    max_node_count = 5
+    machine_type   = "e2-standard-2"  # GKE
+    # instance_types = ["t3.medium"]  # EKS
+  }
+}
+
+# Database
+database_tier       = "db-custom-1-3840"  # GKE
+# database_instance_class = "db.t3.small"  # EKS
+
+# Application
+ingress_host        = "orbit.yourdomain.com"
+ingress_tls_enabled = true
+letsencrypt_email   = "admin@yourdomain.com"
+```
+
+### Connecting to Your Cluster
+
+**GKE:**
+```bash
+gcloud container clusters get-credentials $(terraform output -raw cluster_name) \
+  --region $(terraform output -raw region) \
+  --project $(terraform output -raw project_id)
+```
+
+**EKS:**
+```bash
+aws eks update-kubeconfig \
+  --name $(terraform output -raw cluster_name) \
+  --region $(terraform output -raw region)
+```
+
+### Destroying Infrastructure
+
+```bash
+# Review what will be destroyed
+terraform plan -destroy
+
+# Destroy all resources
+terraform destroy
+```
+
+> ⚠️ **Warning:** This will destroy the database and all data. Back up important data first.
+
+### Remote State Configuration
+
+For team collaboration, configure remote state storage:
+
+**GKE (Google Cloud Storage):**
+```hcl
+# backend.tf
+terraform {
+  backend "gcs" {
+    bucket = "your-terraform-state-bucket"
+    prefix = "orbit/gke"
+  }
+}
+```
+
+**EKS (Amazon S3):**
+```hcl
+# backend.tf
+terraform {
+  backend "s3" {
+    bucket         = "your-terraform-state-bucket"
+    key            = "orbit/eks/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "terraform-locks"
+  }
+}
+```
+
+For more details, see the [Terraform README](../terraform/README.md).
 
 ---
 
