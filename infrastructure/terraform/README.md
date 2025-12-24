@@ -42,7 +42,7 @@ terraform/
 ### Deploying to GKE
 
 ```bash
-cd terraform/environments/gke
+cd infrastructure/terraform/environments/gke
 
 # Copy and configure variables
 cp terraform.tfvars.example terraform.tfvars
@@ -61,7 +61,7 @@ terraform apply
 ### Deploying to EKS
 
 ```bash
-cd terraform/environments/eks
+cd infrastructure/terraform/environments/eks
 
 # Copy and configure variables
 cp terraform.tfvars.example terraform.tfvars
@@ -210,10 +210,10 @@ subnet_ids = ["subnet-1", "subnet-2"]
 
 ### Getting Help
 
-- Check the [Orbit documentation](../docs/SELF-HOSTING.md)
+- Check the [Orbit documentation](../../docs/SELF-HOSTING.md)
 - Open an issue on GitHub
 - Review Terraform logs with `TF_LOG=DEBUG terraform apply`
 
 ## Contributing
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines on contributing to this project.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines on contributing to this project.

@@ -187,10 +187,10 @@ helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update
 
 # Update Helm dependencies
-helm dependency update helm/orbit
+helm dependency update infrastructure/helm/orbit
 
 # Install Orbit
-helm install orbit helm/orbit \
+helm install orbit infrastructure/helm/orbit \
   --namespace orbit \
   --create-namespace \
   --set ingress.host=orbit.yourcompany.com \
@@ -249,7 +249,7 @@ postgresql:
 Install with custom values:
 
 ```bash
-helm install orbit helm/orbit \
+helm install orbit infrastructure/helm/orbit \
   --namespace orbit \
   --create-namespace \
   -f my-values.yaml
@@ -286,7 +286,7 @@ kubectl create secret generic orbit-db-credentials \
 
 ```bash
 # Update to new version
-helm upgrade orbit helm/orbit \
+helm upgrade orbit infrastructure/helm/orbit \
   --namespace orbit \
   -f my-values.yaml \
   --set backend.image.tag=1.1.0 \
@@ -343,7 +343,7 @@ For deploying Orbit on Google Kubernetes Engine (GKE) or Amazon Elastic Kubernet
 ```bash
 # Clone the repository
 git clone https://github.com/your-org/orbit.git
-cd orbit/terraform/environments/gke
+cd orbit/infrastructure/terraform/environments/gke
 
 # Copy and configure variables
 cp terraform.tfvars.example terraform.tfvars
@@ -364,7 +364,7 @@ terraform apply
 ```bash
 # Clone the repository
 git clone https://github.com/your-org/orbit.git
-cd orbit/terraform/environments/eks
+cd orbit/infrastructure/terraform/environments/eks
 
 # Copy and configure variables
 cp terraform.tfvars.example terraform.tfvars
@@ -516,7 +516,7 @@ terraform {
 }
 ```
 
-For more details, see the [Terraform README](../terraform/README.md).
+For more details, see the [Terraform README](../infrastructure/terraform/README.md).
 
 ---
 
@@ -536,7 +536,7 @@ For enterprise teams using GitOps workflows with ArgoCD.
 
 ```bash
 # Apply the ArgoCD Application
-kubectl apply -f argocd/base/application.yaml
+kubectl apply -f infrastructure/argocd/base/application.yaml
 ```
 
 #### Option 2: Using Kustomize overlays
@@ -545,17 +545,17 @@ For environment-specific deployments:
 
 ```bash
 # Production
-kustomize build argocd/overlays/production | kubectl apply -f -
+kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
 
 # Staging
-kustomize build argocd/overlays/staging | kubectl apply -f -
+kustomize build infrastructure/argocd/overlays/staging | kubectl apply -f -
 ```
 
 ### Configure Values
 
 Edit the values files for your environment:
 
-**Production (`argocd/values/production.yaml`):**
+**Production (`infrastructure/argocd/values/production.yaml`):**
 ```yaml
 ingress:
   host: orbit.yourcompany.com  # <-- Change this
@@ -565,7 +565,7 @@ postgresql:
     existingSecret: orbit-db-credentials  # <-- Create this secret
 ```
 
-**Staging (`argocd/values/staging.yaml`):**
+**Staging (`infrastructure/argocd/values/staging.yaml`):**
 ```yaml
 ingress:
   host: staging.orbit.yourcompany.com  # <-- Change this
@@ -634,7 +634,7 @@ argocd app history orbit
 ### Multi-Environment Setup
 
 ```
-argocd/
+infrastructure/argocd/
 ├── base/
 │   ├── application.yaml      # Base ArgoCD Application
 │   └── kustomization.yaml

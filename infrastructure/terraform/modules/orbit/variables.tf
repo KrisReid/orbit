@@ -26,7 +26,7 @@ variable "create_namespace" {
 variable "chart_path" {
   description = "Path to the Helm chart"
   type        = string
-  default     = "../../helm/orbit"
+  default     = "../../../helm/orbit"
 }
 
 variable "chart_version" {
@@ -45,12 +45,6 @@ variable "wait_for_deployment" {
   description = "Wait for the deployment to complete"
   type        = bool
   default     = true
-}
-
-variable "depends_on_resources" {
-  description = "Resources that this release depends on"
-  type        = list(any)
-  default     = []
 }
 
 # -----------------------------------------------------------------------------

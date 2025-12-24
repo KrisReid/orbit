@@ -145,5 +145,6 @@ resource "helm_release" "orbit" {
   timeout = var.helm_timeout
   wait    = var.wait_for_deployment
 
-  depends_on = var.depends_on_resources
+  # Note: Module-level depends_on should be used when calling this module
+  # to ensure proper ordering with database and other infrastructure
 }
