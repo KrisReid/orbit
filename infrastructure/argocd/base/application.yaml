@@ -21,14 +21,15 @@ spec:
   project: default
 
   source:
-    repoURL: https://github.com/your-org/orbit.git
+    repoURL: https://github.com/your-org/orbit.git # UPDATE THIS
     targetRevision: HEAD
-    path: helm/orbit
+    path: infrastructure/helm/orbit
 
     helm:
       releaseName: orbit
       valueFiles:
         - values.yaml
+        - values-production.yaml
         - ../../argocd/values/common.yaml
 
   destination:

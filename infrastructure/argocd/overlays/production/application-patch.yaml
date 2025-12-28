@@ -9,6 +9,7 @@ spec:
     helm:
       valueFiles:
         - values.yaml
+        - values-production.yaml 
         - ../../argocd/values/common.yaml
         - ../../argocd/values/production.yaml
   destination:
