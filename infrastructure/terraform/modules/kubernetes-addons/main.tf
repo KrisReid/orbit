@@ -179,3 +179,29 @@ resource "kubectl_manifest" "letsencrypt_prod" {
 
   depends_on = [helm_release.cert_manager]
 }
+
+# -----------------------------------------------------------------------------
+# ArgoCD
+# -----------------------------------------------------------------------------
+resource "helm_release" "argocd" {
+  count = var.enable_argocd ? 1 : 0
+
+  name             = "argocd"
+  namespace        = var.argocd_namespace
+  create_namespace = true
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-cd"
+  version          = var.argocd_chart_version
+
+  values = [
+    yamlencode({
+      server = {
+        service = {
+          type = "LoadBalancer"
+        }
+      }
+    })
+  ]
+
+  timeout = var.helm_timeout
+}

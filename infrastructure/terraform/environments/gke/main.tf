@@ -104,6 +104,8 @@ module "kubernetes_addons" {
   create_letsencrypt_issuers = var.create_letsencrypt_issuers
   letsencrypt_email          = var.letsencrypt_email
 
+  enable_argocd = true
+
   depends_on = [module.gke]
 }
 

@@ -207,3 +207,24 @@ variable "letsencrypt_email" {
   type        = string
   default     = ""
 }
+
+# -----------------------------------------------------------------------------
+# ArgoCD Configuration
+# -----------------------------------------------------------------------------
+variable "enable_argocd" {
+  description = "Enable ArgoCD"
+  type        = bool
+  default     = false
+}
+
+variable "argocd_namespace" {
+  description = "Namespace for ArgoCD"
+  type        = string
+  default     = "argocd"
+}
+
+variable "argocd_chart_version" {
+  description = "ArgoCD Helm chart version"
+  type        = string
+  default     = "5.51.1"
+}
