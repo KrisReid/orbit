@@ -1,927 +1,232 @@
 # Self-Hosting Guide
 
-This guide covers deploying Orbit for your organization. Choose the deployment method that best fits your infrastructure.
+This guide covers deploying Orbit. Choose local development or cloud deployment based on your needs.
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
-- [Deployment Options](#deployment-options)
-- [Docker Compose Deployment](#docker-compose-deployment)
-- [Kubernetes Deployment (Helm)](#kubernetes-deployment-helm)
-- [Terraform Deployment (GKE/EKS)](#terraform-deployment-gkeeks)
-- [GitOps Deployment (ArgoCD)](#gitops-deployment-argocd)
-- [Configuration Reference](#configuration-reference)
-- [TLS/HTTPS Setup](#tlshttps-setup)
-- [Database Management](#database-management)
-- [Backup and Restore](#backup-and-restore)
-- [Upgrading](#upgrading)
+- [Local Development](#local-development)
+- [Cloud Deployment (EKS/GKE)](#cloud-deployment-eksgke)
 - [Troubleshooting](#troubleshooting)
 
 ---
 
-## Quick Start
+## Local Development
 
-The fastest way to get Orbit running:
+### Option 1: Docker Compose (Simplest)
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/orbit.git
+git clone https://github.com/YOUR_ORG/orbit.git
 cd orbit
 
-# Run the installation script
-./install.sh
+# Copy environment file
+cp .env.example .env
 
-# Start Orbit
-docker compose -f docker-compose.prod.yml up -d
+# Start all services
+docker compose up -d
+
+# Access the application
+open http://localhost
 ```
-
-Access Orbit at `https://your-domain.com` (or `http://localhost` for local testing).
 
 **Default credentials:**
 - Email: `admin@orbit.example.com`
 - Password: `admin123`
 
-> ⚠️ **Change the default password immediately after first login!!!**
+> ⚠️ Change the default password immediately after first login.
+
+### Option 2: Local Kubernetes (Helm)
+
+For testing Kubernetes deployments locally using minikube, kind, or Docker Desktop:
+
+```bash
+# Start local Kubernetes (example with minikube)
+minikube start
+
+# Build and load local images
+docker build -t orbit-backend:local ./backend
+docker build -t orbit-frontend:local ./frontend
+minikube image load orbit-backend:local
+minikube image load orbit-frontend:local
+
+# Install Helm chart
+helm dependency update ./infrastructure/helm/orbit
+helm install orbit ./infrastructure/helm/orbit \
+  -f ./infrastructure/helm/orbit/values-local.yaml
+
+# Access the application
+minikube tunnel  # Run in separate terminal
+echo "127.0.0.1 orbit.local" | sudo tee -a /etc/hosts
+open http://orbit.local
+```
 
 ---
 
-## Deployment Options
+## Cloud Deployment (EKS/GKE)
 
-| Method | Best For | Complexity | High Availability |
-|--------|----------|------------|-------------------|
-| [Docker Compose](#docker-compose-deployment) | Small teams, single server | Low | No |
-| [Kubernetes (Helm)](#kubernetes-deployment-helm) | Medium to large orgs | Medium | Yes |
-| [Terraform (GKE/EKS)](#terraform-deployment) | Cloud-native infrastructure | Medium-High | Yes |
-| [GitOps (ArgoCD)](#gitops-deployment-argocd) | Enterprise, platform teams | High | Yes |
-
----
-
-## Docker Compose Deployment
+Production deployment using Terraform (infrastructure) and ArgoCD (application).
 
 ### Prerequisites
 
-- **Operating System:** Linux (Ubuntu 20.04+, Debian 11+, RHEL 8+), macOS, or Windows with WSL2
-- **Docker:** 20.10+ with Docker Compose v2
-- **Memory:** Minimum 2GB RAM (4GB+ recommended)
-- **Storage:** Minimum 10GB free disk space
-- **Network:** Port 80 and 443 available (or custom ports)
-
-### Installation Steps
-
-#### 1. Clone the Repository
-
-```bash
-git clone https://github.com/your-org/orbit.git
-cd orbit
-```
-
-#### 2. Run the Installation Script
-
-```bash
-./install.sh
-```
-
-The script will:
-- Check Docker prerequisites
-- Generate secure secrets (SECRET_KEY, POSTGRES_PASSWORD)
-- Create `.env` configuration file
-- Guide you through domain and email configuration
-
-#### 3. Configure Your Domain (Production)
-
-For production deployments, ensure:
-
-1. **DNS is configured:** Your domain points to the server's IP address
-2. **Ports are open:** 80 (HTTP) and 443 (HTTPS) are accessible
-3. **Email is valid:** Required for Let's Encrypt certificates
-
-Edit `.env` if needed:
-
-```bash
-DOMAIN=orbit.yourcompany.com
-ACME_EMAIL=admin@yourcompany.com
-```
-
-#### 4. Start Orbit
-
-**Local testing (HTTP only):**
-```bash
-docker compose -f docker-compose.prod.yml up -d
-```
-
-**Production (with TLS):**
-```bash
-docker compose -f docker-compose.prod.yml -f docker-compose.tls.yml up -d
-```
-
-#### 5. Verify Deployment
-
-```bash
-# Check all containers are running
-docker compose -f docker-compose.prod.yml ps
-
-# View logs
-docker compose -f docker-compose.prod.yml logs -f
-
-# Test health endpoint
-curl http://localhost/health
-```
-
-### Architecture
-
-```
-┌────────────────────────────────────────────────────────────┐
-│                    Docker Host                              │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                    Traefik                           │   │
-│  │              (Reverse Proxy + TLS)                   │   │
-│  │                                                      │   │
-│  │    :80 ──► HTTP redirect to HTTPS                   │   │
-│  │    :443 ──► Routes to services                      │   │
-│  └──────────────────────┬──────────────────────────────┘   │
-│                         │                                   │
-│         ┌───────────────┴───────────────┐                  │
-│         │                               │                  │
-│         ▼                               ▼                  │
-│  ┌─────────────┐                ┌─────────────┐           │
-│  │  Frontend   │                │   Backend   │           │
-│  │   (nginx)   │                │  (FastAPI)  │           │
-│  │             │                │             │           │
-│  │ Static SPA  │                │  REST API   │           │
-│  └─────────────┘                └──────┬──────┘           │
-│                                        │                   │
-│                                        ▼                   │
-│                                 ┌─────────────┐           │
-│                                 │ PostgreSQL  │           │
-│                                 │             │           │
-│                                 │ [Volume]    │           │
-│                                 └─────────────┘           │
-│                                                             │
-└────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Kubernetes Deployment (Helm)
-
-For production deployments requiring high availability, scalability, and enterprise features.
-
-### Prerequisites
-
-- **Kubernetes:** 1.25+ (EKS, GKE, AKS, or self-managed)
-- **Helm:** 3.10+
-- **kubectl:** Configured with cluster access
-- **Ingress Controller:** nginx-ingress or Traefik
-- **cert-manager:** (Optional) For automatic TLS
-
-### Quick Start
-
-```bash
-# Clone the repository
-git clone https://github.com/your-org/orbit.git
-cd orbit
-
-# Add Bitnami repo for PostgreSQL dependency
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
-
-# Update Helm dependencies
-helm dependency update infrastructure/helm/orbit
-
-# Install Orbit
-helm install orbit infrastructure/helm/orbit \
-  --namespace orbit \
-  --create-namespace \
-  --set ingress.host=orbit.yourcompany.com \
-  --set postgresql.auth.password=your-secure-password \
-  --set backend.secrets.secretKey=your-secret-key
-```
-
-### Custom Values File
-
-Create a `my-values.yaml` for your environment:
-
-```yaml
-# my-values.yaml
-backend:
-  replicaCount: 2
-  image:
-    repository: ghcr.io/your-org/orbit-backend
-    tag: "1.0.0"
-  resources:
-    requests:
-      memory: "512Mi"
-      cpu: "250m"
-    limits:
-      memory: "1Gi"
-      cpu: "1000m"
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 10
-
-frontend:
-  replicaCount: 2
-  image:
-    repository: ghcr.io/your-org/orbit-frontend
-    tag: "1.0.0"
-
-ingress:
-  enabled: true
-  className: nginx
-  host: orbit.yourcompany.com
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-  tls:
-    enabled: true
-    secretName: orbit-tls
-
-postgresql:
-  enabled: true
-  auth:
-    password: "your-secure-db-password"
-  primary:
-    persistence:
-      size: 20Gi
-```
-
-Install with custom values:
-
-```bash
-helm install orbit infrastructure/helm/orbit \
-  --namespace orbit \
-  --create-namespace \
-  -f my-values.yaml
-```
-
-### Using External Database
-
-To use an existing PostgreSQL (RDS, CloudSQL, etc.):
-
-```yaml
-# my-values.yaml
-postgresql:
-  enabled: false
-
-externalDatabase:
-  enabled: true
-  host: your-db-host.rds.amazonaws.com
-  port: 5432
-  database: orbit
-  username: orbit
-  existingSecret: orbit-db-credentials
-  existingSecretPasswordKey: password
-```
-
-Create the database secret:
-
-```bash
-kubectl create secret generic orbit-db-credentials \
-  --namespace orbit \
-  --from-literal=password=your-db-password
-```
-
-### Upgrading
-
-```bash
-# Update to new version
-helm upgrade orbit infrastructure/helm/orbit \
-  --namespace orbit \
-  -f my-values.yaml \
-  --set backend.image.tag=1.1.0 \
-  --set frontend.image.tag=1.1.0
-```
-
-### Rollback
-
-```bash
-# List revision history
-helm history orbit --namespace orbit
-
-# Rollback to previous revision
-helm rollback orbit --namespace orbit
-
-# Rollback to specific revision
-helm rollback orbit 2 --namespace orbit
-```
-
-### Uninstall
-
-```bash
-# Uninstall Orbit (keeps PVCs by default)
-helm uninstall orbit --namespace orbit
-
-# Delete namespace and all resources
-kubectl delete namespace orbit
-```
-
----
-
-## Terraform Deployment (GKE/EKS)
-
-For deploying Orbit on Google Kubernetes Engine (GKE) or Amazon Elastic Kubernetes Service (EKS) with complete infrastructure-as-code.
-
-### Prerequisites
-
-**Common:**
 - [Terraform](https://www.terraform.io/downloads) >= 1.5.0
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
-- [Helm](https://helm.sh/docs/intro/install/) >= 3.0
+- AWS CLI (for EKS) or gcloud CLI (for GKE)
+- A domain name for TLS
 
-**For GKE:**
-- [Google Cloud SDK](https://cloud.google.com/sdk/docs/install)
-- A GCP project with billing enabled
-- Enabled APIs: Kubernetes Engine, Cloud SQL, Compute Engine
+### Step 1: Fork the Repository
 
-**For EKS:**
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- AWS account with appropriate IAM permissions
+Fork or clone the Orbit repository to your own GitHub organization. You'll need this for ArgoCD to sync from.
 
-### Quick Start - GKE
+### Step 2: Deploy Infrastructure with Terraform
 
+**For AWS EKS:**
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/orbit.git
-cd orbit/infrastructure/terraform/environments/gke
+cd infrastructure/terraform/environments/eks
 
-# Copy and configure variables
+# Configure variables
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values (project_id, region, etc.)
+vim terraform.tfvars  # Edit with your values
 
-# Initialize Terraform
+# Deploy infrastructure
 terraform init
-
-# Review the plan
-terraform plan
-
-# Apply the configuration
 terraform apply
-```
 
-### Quick Start - EKS
-
-```bash
-# Clone the repository
-git clone https://github.com/your-org/orbit.git
-cd orbit/infrastructure/terraform/environments/eks
-
-# Copy and configure variables
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values (region, etc.)
-
-# Initialize Terraform
-terraform init
-
-# Review the plan
-terraform plan
-
-# Apply the configuration
-terraform apply
-```
-
-### What Gets Created
-
-The Terraform configuration provisions:
-
-| Component | GKE | EKS |
-|-----------|-----|-----|
-| VPC & Networking | VPC, Subnet, Cloud NAT | VPC, Subnets, NAT Gateway |
-| Kubernetes Cluster | GKE (Regional) | EKS |
-| Database | Cloud SQL PostgreSQL | RDS PostgreSQL |
-| Ingress | NGINX Ingress Controller | NGINX Ingress + NLB |
-| TLS | cert-manager + Let's Encrypt | cert-manager + Let's Encrypt |
-| Application | Orbit via Helm | Orbit via Helm |
-
-### Architecture
-
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                        Cloud Provider (GCP/AWS)                           │
-│                                                                           │
-│  ┌─────────────────────────────────────────────────────────────────────┐ │
-│  │                         VPC Network                                  │ │
-│  │                                                                      │ │
-│  │  ┌────────────────────────────────────────────────────────────────┐ │ │
-│  │  │                    Kubernetes Cluster                          │ │ │
-│  │  │                                                                │ │ │
-│  │  │  ┌──────────────────────────────────────────────────────────┐ │ │ │
-│  │  │  │                    Ingress (NGINX)                       │ │ │ │
-│  │  │  │                   + cert-manager                         │ │ │ │
-│  │  │  └────────────────────────┬─────────────────────────────────┘ │ │ │
-│  │  │                           │                                    │ │ │
-│  │  │           ┌───────────────┴───────────────┐                   │ │ │
-│  │  │           │                               │                   │ │ │
-│  │  │           ▼                               ▼                   │ │ │
-│  │  │    ┌─────────────┐                ┌─────────────┐            │ │ │
-│  │  │    │  Frontend   │                │   Backend   │            │ │ │
-│  │  │    │  (nginx)    │                │  (FastAPI)  │            │ │ │
-│  │  │    └─────────────┘                └──────┬──────┘            │ │ │
-│  │  │                                          │                    │ │ │
-│  │  └──────────────────────────────────────────│────────────────────┘ │ │
-│  │                                             │                       │ │
-│  │                                             ▼                       │ │
-│  │  ┌────────────────────────────────────────────────────────────────┐ │ │
-│  │  │              Managed Database (Cloud SQL / RDS)                │ │ │
-│  │  │                       PostgreSQL                                │ │ │
-│  │  └────────────────────────────────────────────────────────────────┘ │ │
-│  └──────────────────────────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────────────────────────┘
-```
-
-### Configuration Variables
-
-Key variables to configure in `terraform.tfvars`:
-
-```hcl
-# Required
-project_name = "orbit"
-region       = "us-central1"       # GKE: GCP region, EKS: AWS region
-project_id   = "your-gcp-project"  # GKE only
-
-# Cluster
-node_pools = {
-  default = {
-    min_node_count = 1
-    max_node_count = 5
-    machine_type   = "e2-standard-2"  # GKE
-    # instance_types = ["t3.medium"]  # EKS
-  }
-}
-
-# Database
-database_tier       = "db-custom-1-3840"  # GKE
-# database_instance_class = "db.t3.small"  # EKS
-
-# Application
-ingress_host        = "orbit.yourdomain.com"
-ingress_tls_enabled = true
-letsencrypt_email   = "admin@yourdomain.com"
-```
-
-### Connecting to Your Cluster
-
-**GKE:**
-```bash
-gcloud container clusters get-credentials $(terraform output -raw cluster_name) \
-  --region $(terraform output -raw region) \
-  --project $(terraform output -raw project_id)
-```
-
-**EKS:**
-```bash
+# Configure kubectl
 aws eks update-kubeconfig \
   --name $(terraform output -raw cluster_name) \
   --region $(terraform output -raw region)
 ```
 
-### Destroying Infrastructure
-
+**For GCP GKE:**
 ```bash
-# Review what will be destroyed
-terraform plan -destroy
-
-# Destroy all resources
-terraform destroy
-```
-
-> ⚠️ **Warning:** This will destroy the database and all data. Back up important data first.
-
-### Remote State Configuration
-
-For team collaboration, configure remote state storage:
-
-**GKE (Google Cloud Storage):**
-```hcl
-# backend.tf
-terraform {
-  backend "gcs" {
-    bucket = "your-terraform-state-bucket"
-    prefix = "orbit/gke"
-  }
-}
-```
-
-**EKS (Amazon S3):**
-```hcl
-# backend.tf
-terraform {
-  backend "s3" {
-    bucket         = "your-terraform-state-bucket"
-    key            = "orbit/eks/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "terraform-locks"
-  }
-}
-```
-
-For more details, see the [Infrastructure README](../infrastructure/README.md).
-
----
-
-## GitOps Deployment (ArgoCD)
-
-For enterprise teams using GitOps workflows with ArgoCD.
-
-### Prerequisites
-
-- **Kubernetes:** 1.25+ (EKS or GKE recommended)
-- **Terraform:** Infrastructure provisioned using `infrastructure/terraform/environments/eks` or `gke`
-- **Git repository:** Fork of Orbit or your own repo
-
-### Recommended Deployment Flow
-
-The recommended approach separates infrastructure provisioning from application deployment:
-
-1. **Terraform** provisions infrastructure (VPC, Kubernetes, Database, ArgoCD, External Secrets)
-2. **ArgoCD** manages application deployments (syncs from Git)
-
-### Step 1: Deploy Infrastructure with Terraform
-
-```bash
-# For EKS
-cd infrastructure/terraform/environments/eks
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-terraform init && terraform apply
-
-# For GKE
 cd infrastructure/terraform/environments/gke
+
+# Configure variables
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-terraform init && terraform apply
+vim terraform.tfvars  # Edit with your values
+
+# Deploy infrastructure
+terraform init
+terraform apply
+
+# Configure kubectl (command from terraform output)
+$(terraform output -raw kubeconfig_command)
 ```
 
-This creates:
+Terraform creates:
 - VPC and networking
-- Kubernetes cluster
-- Managed database (RDS/CloudSQL)
+- Kubernetes cluster (EKS or GKE)
+- Managed PostgreSQL database (RDS or Cloud SQL)
 - ArgoCD installation
-- External Secrets Operator with cloud IAM integration
-- ClusterSecretStore and ExternalSecret for database credentials
+- External Secrets Operator with database credentials
 
-### Step 2: Deploy Application with ArgoCD
+### Step 3: Deploy Application with ArgoCD
 
 ```bash
 # Edit the overlay with your configuration
-vi infrastructure/argocd/overlays/production/application-patch.yaml
-
-# Update these values:
-# - source.repoURL: Your Git repository URL
-# - ingress.host: Your production domain
-# - image repositories: Your container registry
-
-# Apply the ArgoCD Application
-kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
+vim infrastructure/argocd/overlays/production/application-patch.yaml
 ```
 
-### Secrets Management
+**Update these values:**
+- `source.repoURL`: Your forked Git repository URL
+- `ingress.host`: Your production domain
+- `image repositories`: Your container registry (e.g., `ghcr.io/YOUR_ORG/orbit-backend`)
 
-Database credentials are automatically synced from cloud secret managers:
+```bash
+# Apply the ArgoCD Application
+kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
 
-- **AWS:** Secrets Manager → External Secrets Operator → Kubernetes Secret
-- **GCP:** Secret Manager → External Secrets Operator → Kubernetes Secret
+# Check deployment status
+kubectl get applications -n argocd
+```
 
-The Terraform gitops modules create:
-1. `ClusterSecretStore` pointing to the cloud secret manager
-2. `ExternalSecret` that syncs database credentials to `orbit-db-credentials`
+### Step 4: Configure DNS
+
+Point your domain to the ingress controller:
+
+```bash
+# Get the load balancer address
+kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+```
+
+Create a DNS A record (or CNAME) pointing your domain to this address.
+
+### Step 5: Access ArgoCD UI (Optional)
+
+```bash
+# Get admin password
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath="{.data.password}" | base64 -d
+
+# Port forward to access UI
+kubectl port-forward svc/argocd-server -n argocd 8080:443
+
+# Open https://localhost:8080 (username: admin)
+```
 
 ### GitOps Workflow
 
-1. **Push changes** to your repository (main branch for production, develop for staging)
-2. **ArgoCD detects changes** and syncs automatically
-3. **Monitor sync status** in ArgoCD UI or CLI
+After initial deployment, ArgoCD automatically syncs changes:
 
+1. Push changes to your repository (main branch)
+2. ArgoCD detects changes and syncs automatically
+3. Monitor status: `kubectl get applications -n argocd`
+
+For staging environment, use the staging overlay which tracks the `develop` branch:
 ```bash
-# Check application status
-kubectl get applications -n argocd
-
-# View detailed status
-argocd app get orbit
-
-# Sync manually if needed
-argocd app sync orbit
-```
-
-### Multi-Environment Setup
-
-```
-infrastructure/argocd/
-├── base/
-│   ├── application.yaml      # Base ArgoCD Application
-│   └── kustomization.yaml
-└── overlays/
-    ├── production/           # Production (main branch)
-    │   ├── application-patch.yaml
-    │   └── kustomization.yaml
-    └── staging/              # Staging (develop branch)
-        ├── application-patch.yaml
-        └── kustomization.yaml
-```
-
-For detailed infrastructure documentation, see the [Infrastructure README](../infrastructure/README.md).
-
----
-
-## Configuration Reference
-
-### Environment Variables
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `DOMAIN` | Domain where Orbit is accessible | `localhost` | Yes |
-| `ACME_EMAIL` | Email for Let's Encrypt certificates | - | For TLS |
-| `SECRET_KEY` | JWT signing key (auto-generated) | - | Yes |
-| `POSTGRES_PASSWORD` | Database password (auto-generated) | - | Yes |
-| `POSTGRES_USER` | Database username | `orbit` | No |
-| `POSTGRES_DB` | Database name | `orbit` | No |
-| `TASK_ID_PREFIX` | Prefix for task IDs (e.g., MYORG-123) | `ORBIT` | No |
-| `DEBUG` | Enable debug mode | `false` | No |
-
-### GitHub Integration (Optional)
-
-| Variable | Description |
-|----------|-------------|
-| `GITHUB_WEBHOOK_SECRET` | Secret for GitHub webhooks |
-| `GITHUB_APP_ID` | GitHub App ID for advanced integration |
-| `GITHUB_PRIVATE_KEY` | GitHub App private key |
-
----
-
-## TLS/HTTPS Setup
-
-### Automatic (Let's Encrypt)
-
-The default `docker-compose.prod.yml` automatically handles TLS via Traefik and Let's Encrypt:
-
-1. Ensure your domain's DNS points to the server
-2. Port 80 must be accessible (for ACME challenge)
-3. Set `ACME_EMAIL` in `.env`
-4. Start the stack - certificates are automatically obtained
-
-### Custom Certificates
-
-To use your own certificates:
-
-1. Place certificates in a `certs/` directory:
-   ```
-   certs/
-   ├── cert.pem
-   └── key.pem
-   ```
-
-2. Update Traefik configuration in `docker-compose.prod.yml`:
-   ```yaml
-   traefik:
-     volumes:
-       - ./certs:/certs:ro
-     command:
-       # ... existing commands ...
-       - "--providers.file.filename=/etc/traefik/dynamic.yml"
-   ```
-
-3. Create `traefik-dynamic.yml`:
-   ```yaml
-   tls:
-     certificates:
-       - certFile: /certs/cert.pem
-         keyFile: /certs/key.pem
-   ```
-
-### Behind a Load Balancer
-
-If Orbit is behind an AWS ALB, Cloudflare, or similar:
-
-1. Use `docker-compose.prod.yml` without the TLS overlay (HTTP only)
-2. Configure your load balancer to handle TLS termination
-3. Set appropriate headers for forwarded requests
-
----
-
-## Database Management
-
-### Accessing PostgreSQL
-
-```bash
-# Connect to the database container
-docker compose -f docker-compose.prod.yml exec db psql -U orbit -d orbit
-
-# Run SQL commands
-\dt          # List tables
-\d users     # Describe users table
-SELECT * FROM users LIMIT 5;
-```
-
-### Database Migrations
-
-Migrations run automatically on startup. To manually trigger:
-
-```bash
-docker compose -f docker-compose.prod.yml exec backend python -m alembic upgrade head
-```
-
-### Using External Database
-
-To use an external PostgreSQL (RDS, CloudSQL, etc.):
-
-1. Comment out the `db` service in `docker-compose.prod.yml`
-2. Update `DATABASE_URL` in `.env`:
-   ```
-   DATABASE_URL=postgresql+asyncpg://user:password@your-db-host:5432/orbit
-   ```
-
----
-
-## Backup and Restore
-
-### Database Backup
-
-**Manual backup:**
-```bash
-# Create backup
-docker compose -f docker-compose.prod.yml exec db pg_dump -U orbit orbit > backup_$(date +%Y%m%d_%H%M%S).sql
-
-# Compressed backup
-docker compose -f docker-compose.prod.yml exec db pg_dump -U orbit -Fc orbit > backup_$(date +%Y%m%d_%H%M%S).dump
-```
-
-**Automated backups (cron):**
-```bash
-# Add to crontab (daily at 2 AM)
-0 2 * * * cd /path/to/orbit && docker compose -f docker-compose.prod.yml exec -T db pg_dump -U orbit -Fc orbit > /backups/orbit_$(date +\%Y\%m\%d).dump
-```
-
-### Database Restore
-
-```bash
-# From SQL file
-docker compose -f docker-compose.prod.yml exec -T db psql -U orbit -d orbit < backup.sql
-
-# From compressed dump
-docker compose -f docker-compose.prod.yml exec -T db pg_restore -U orbit -d orbit < backup.dump
-```
-
-### Full System Backup
-
-```bash
-# Stop services
-docker compose -f docker-compose.prod.yml down
-
-# Backup volumes
-docker run --rm -v orbit_postgres-data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_data.tar.gz /data
-
-# Backup configuration
-cp .env .env.backup
-
-# Restart services
-docker compose -f docker-compose.prod.yml up -d
-```
-
----
-
-## Upgrading
-
-### Standard Upgrade
-
-```bash
-# Pull latest code
-git pull origin main
-
-# Pull latest images
-docker compose -f docker-compose.prod.yml pull
-
-# Restart with new images
-docker compose -f docker-compose.prod.yml up -d
-
-# Verify
-docker compose -f docker-compose.prod.yml ps
-docker compose -f docker-compose.prod.yml logs -f backend
-```
-
-### Upgrading to Specific Version
-
-```bash
-# Checkout specific version
-git fetch --tags
-git checkout v1.2.3
-
-# Update and restart
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
-```
-
-### Rollback
-
-```bash
-# Checkout previous version
-git checkout v1.2.2
-
-# Restore previous images
-docker compose -f docker-compose.prod.yml up -d
-
-# If database migration issues, restore from backup
-docker compose -f docker-compose.prod.yml exec -T db psql -U orbit -d orbit < backup.sql
+kustomize build infrastructure/argocd/overlays/staging | kubectl apply -f -
 ```
 
 ---
 
 ## Troubleshooting
 
-### Common Issues
-
-#### Container won't start
+### Application Not Starting
 
 ```bash
-# Check container status
-docker compose -f docker-compose.prod.yml ps
+# Check pod status
+kubectl get pods -n orbit
 
-# View logs
-docker compose -f docker-compose.prod.yml logs backend
-docker compose -f docker-compose.prod.yml logs db
+# View pod logs
+kubectl logs -l app.kubernetes.io/name=orbit-backend -n orbit
 ```
 
-#### Database connection errors
+### Database Connection Issues
 
 ```bash
-# Verify database is healthy
-docker compose -f docker-compose.prod.yml exec db pg_isready -U orbit
+# Verify secret exists
+kubectl get secret orbit-db-credentials -n orbit
 
-# Check database logs
-docker compose -f docker-compose.prod.yml logs db
+# Check ExternalSecret status
+kubectl get externalsecrets -n orbit
+kubectl describe externalsecret orbit-db-credentials -n orbit
 ```
 
-#### TLS certificate issues
+### ArgoCD Sync Issues
 
 ```bash
-# Check Traefik logs
-docker compose -f docker-compose.prod.yml logs traefik
+# Check application status
+kubectl get applications -n argocd
+kubectl describe application orbit -n argocd
 
-# Verify ACME challenge is accessible
-curl http://your-domain.com/.well-known/acme-challenge/test
+# Force sync
+argocd app sync orbit
 ```
 
-#### Port already in use
+### TLS Certificate Not Ready
 
 ```bash
-# Find process using port
-sudo lsof -i :80
-sudo lsof -i :443
+# Check certificate status
+kubectl get certificates -n orbit
+kubectl describe certificate orbit-tls -n orbit
 
-# Kill process or change port in docker-compose
-```
-
-### Health Checks
-
-```bash
-# Backend health
-curl http://localhost:8000/health
-
-# Frontend health
-curl http://localhost/health
-
-# Full stack (through Traefik)
-curl https://your-domain.com/health
-curl https://your-domain.com/api/v1/health
-```
-
-### Reset Everything
-
-```bash
-# Stop all containers
-docker compose -f docker-compose.prod.yml down
-
-# Remove volumes (DELETES ALL DATA!)
-docker compose -f docker-compose.prod.yml down -v
-
-# Remove images
-docker compose -f docker-compose.prod.yml down --rmi all
-
-# Fresh start
-./install.sh
-docker compose -f docker-compose.prod.yml up -d
+# Check cert-manager logs
+kubectl logs -n cert-manager -l app=cert-manager
 ```
 
 ---
 
-## Security Checklist
+## Additional Resources
 
-Before deploying to production:
-
-- [ ] Changed default admin password
-- [ ] Set unique `SECRET_KEY` (auto-generated by install script)
-- [ ] Set unique `POSTGRES_PASSWORD` (auto-generated by install script)
-- [ ] Configured valid domain and TLS
-- [ ] Set `DEBUG=false`
-- [ ] Configured firewall (only ports 80, 443 exposed)
-- [ ] Set up automated backups
-- [ ] Reviewed CORS settings
-- [ ] Configured log rotation
-
----
-
-## Getting Help
-
-- **Documentation:** [docs/architecture.md](architecture.md)
-- **Issues:** [GitHub Issues](https://github.com/your-org/orbit/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/your-org/orbit/discussions)
+- [Architecture Guide](architecture.md) - Technical architecture details
+- [Contributing Guide](../CONTRIBUTING.md) - Development workflow
