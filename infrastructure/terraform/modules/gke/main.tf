@@ -7,6 +7,10 @@
 # -----------------------------------------------------------------------------
 # Data Sources
 # -----------------------------------------------------------------------------
+data "google_project" "main" {
+  project_id = var.project_id
+}
+
 data "google_container_engine_versions" "main" {
   project        = var.project_id
   location       = var.region

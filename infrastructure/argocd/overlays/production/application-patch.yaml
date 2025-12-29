@@ -38,9 +38,8 @@ spec:
           replicaCount: 2
           
           image:
-            # UPDATE THIS: Your container registry
-            repository: ghcr.io/KrisReid/orbit-backend
-            tag: latest  # Consider using specific versions in production
+            repository: europe-west2-docker.pkg.dev/gen-lang-client-0354936138/orbit/backend
+            tag: latest
             pullPolicy: IfNotPresent
           
           resources:
@@ -65,8 +64,7 @@ spec:
           replicaCount: 2
           
           image:
-            # UPDATE THIS: Your container registry
-            repository: ghcr.io/KrisReid/orbit-frontend
+            repository: europe-west2-docker.pkg.dev/gen-lang-client-0354936138/orbit/frontend
             tag: latest
             pullPolicy: IfNotPresent
 

@@ -190,6 +190,15 @@ variable "database_point_in_time_recovery" {
 }
 
 # -----------------------------------------------------------------------------
+# Container Registry
+# -----------------------------------------------------------------------------
+variable "create_artifact_registry" {
+  description = "Create Google Artifact Registry for container images"
+  type        = bool
+  default     = true
+}
+
+# -----------------------------------------------------------------------------
 # Kubernetes Addons
 # -----------------------------------------------------------------------------
 variable "enable_nginx_ingress" {

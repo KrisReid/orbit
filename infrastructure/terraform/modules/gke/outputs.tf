@@ -44,6 +44,12 @@ output "node_pools" {
   value       = { for k, v in google_container_node_pool.main : k => v.name }
 }
 
+# Node service account
+output "node_service_account" {
+  description = "The service account used by GKE nodes"
+  value       = var.node_service_account != null ? var.node_service_account : "${data.google_project.main.number}-compute@developer.gserviceaccount.com"
+}
+
 # Kubeconfig helper
 output "kubeconfig_command" {
   description = "Command to configure kubectl"

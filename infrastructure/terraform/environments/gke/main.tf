@@ -25,7 +25,8 @@ resource "google_project_service" "main" {
     "servicenetworking.googleapis.com",
     "sqladmin.googleapis.com",
     "secretmanager.googleapis.com",
-    "iam.googleapis.com"
+    "iam.googleapis.com",
+    "artifactregistry.googleapis.com"
   ])
 
   project                    = var.project_id
@@ -124,6 +125,32 @@ module "database" {
   deletion_protection = var.deletion_protection
 
   depends_on = [module.vpc]
+}
+
+# -----------------------------------------------------------------------------
+# Artifact Registry (Container Registry for application images)
+# -----------------------------------------------------------------------------
+resource "google_artifact_registry_repository" "orbit" {
+  count = var.create_artifact_registry ? 1 : 0
+
+  location      = var.region
+  repository_id = var.project_name
+  description   = "Container images for ${var.project_name}"
+  format        = "DOCKER"
+  project       = var.project_id
+
+  labels = var.labels
+
+  depends_on = [google_project_service.main]
+}
+
+# Grant GKE nodes permission to pull images from Artifact Registry
+resource "google_project_iam_member" "gke_artifact_registry_reader" {
+  count = var.create_artifact_registry ? 1 : 0
+
+  project = var.project_id
+  role    = "roles/artifactregistry.reader"
+  member  = "serviceAccount:${module.gke.node_service_account}"
 }
 
 # -----------------------------------------------------------------------------

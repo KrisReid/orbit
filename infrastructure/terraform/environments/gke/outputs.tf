@@ -98,6 +98,24 @@ output "external_secrets_namespace" {
 }
 
 # -----------------------------------------------------------------------------
+# Container Registry Outputs
+# -----------------------------------------------------------------------------
+output "artifact_registry_url" {
+  description = "URL of the Artifact Registry repository for container images"
+  value       = var.create_artifact_registry ? "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.orbit[0].repository_id}" : null
+}
+
+output "artifact_registry_backend_image" {
+  description = "Full image path for backend container"
+  value       = var.create_artifact_registry ? "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.orbit[0].repository_id}/backend" : null
+}
+
+output "artifact_registry_frontend_image" {
+  description = "Full image path for frontend container"
+  value       = var.create_artifact_registry ? "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.orbit[0].repository_id}/frontend" : null
+}
+
+# -----------------------------------------------------------------------------
 # GitOps Outputs
 # -----------------------------------------------------------------------------
 output "gitops_secret_store_name" {
@@ -139,22 +157,31 @@ output "next_steps" {
     1. Configure kubectl:
        ${module.gke.kubeconfig_command}
     
-    2. Navigate to the project root and deploy the ArgoCD Application:
-       cd ../../../../  # Go to project root (orbit/)
+    2. Build and push container images:
+       # Configure Docker for Artifact Registry
+       gcloud auth configure-docker ${var.region}-docker.pkg.dev
        
-       # Edit the overlay with your repository URL and domain:
-       vim infrastructure/argocd/overlays/production/application-patch.yaml
-       
-       # Apply the ArgoCD Application:
+       # From project root, build and push images
+       docker build -t ${var.region}-docker.pkg.dev/${var.project_id}/${var.project_name}/backend:latest ./backend
+       docker build -t ${var.region}-docker.pkg.dev/${var.project_id}/${var.project_name}/frontend:latest ./frontend
+       docker push ${var.region}-docker.pkg.dev/${var.project_id}/${var.project_name}/backend:latest
+       docker push ${var.region}-docker.pkg.dev/${var.project_id}/${var.project_name}/frontend:latest
+    
+    3. Update ArgoCD overlay with your image paths:
+       # Edit infrastructure/argocd/overlays/production/application-patch.yaml
+       # Set backend.image.repository to: ${var.region}-docker.pkg.dev/${var.project_id}/${var.project_name}/backend
+       # Set frontend.image.repository to: ${var.region}-docker.pkg.dev/${var.project_id}/${var.project_name}/frontend
+    
+    4. Deploy the ArgoCD Application (from project root):
        kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
     
-    3. Check ArgoCD Application status:
+    5. Check ArgoCD Application status:
        kubectl get applications -n argocd
     
-    4. Get ArgoCD admin password:
+    6. Get ArgoCD admin password:
        kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
     
-    5. Access ArgoCD UI:
+    7. Access ArgoCD UI:
        kubectl port-forward svc/argocd-server -n argocd 8080:443
        Then open: https://localhost:8080
     
