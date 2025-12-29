@@ -109,23 +109,76 @@ module "kubernetes_addons" {
   create_letsencrypt_issuers = var.create_letsencrypt_issuers
   letsencrypt_email          = var.letsencrypt_email
 
+  # ArgoCD
+  enable_argocd = var.enable_argocd
+
+  # External Secrets Operator
+  enable_external_secrets = var.enable_external_secrets
+  external_secrets_service_account_annotations = var.enable_external_secrets ? {
+    "eks.amazonaws.com/role-arn" = module.gitops[0].external_secrets_role_arn
+  } : {}
+
   depends_on = [module.eks]
 }
 
 # -----------------------------------------------------------------------------
-# Note: Orbit Application Deployment
+# GitOps Bootstrap (External Secrets + ArgoCD Application)
 # -----------------------------------------------------------------------------
-# The Orbit application is deployed via ArgoCD (GitOps), not Terraform.
-# See infrastructure/argocd/ for application deployment configuration.
-#
-# This Terraform configuration provisions:
-# - VPC networking
-# - EKS cluster
-# - RDS database
-# - Kubernetes addons (ingress-nginx, cert-manager)
-#
-# ArgoCD deploys:
-# - Orbit Helm chart (backend, frontend, ingress)
-#
-# Database connection info is available via outputs for ArgoCD configuration.
-# -----------------------------------------------------------------------------
+module "gitops" {
+  source = "../../modules/gitops-aws"
+  count  = var.enable_gitops_bootstrap ? 1 : 0
+
+  region       = var.region
+  cluster_name = module.eks.cluster_name
+
+  # IRSA configuration
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_provider_url
+
+  # External Secrets configuration
+  external_secrets_namespace       = var.external_secrets_namespace
+  external_secrets_service_account = var.external_secrets_service_account
+  external_secrets_ready           = module.kubernetes_addons
+  secret_refresh_interval          = var.secret_refresh_interval
+
+  # Database configuration (from RDS module)
+  database_host        = module.database.instance_address
+  database_name        = var.database_name
+  database_user        = var.database_user
+  database_secret_name = module.database.secret_name
+
+  # Application configuration
+  application_namespace = var.application_namespace
+
+  # ArgoCD configuration
+  argocd_namespace          = var.argocd_namespace
+  deploy_argocd_application = var.deploy_argocd_application
+  enable_argocd_finalizer   = var.enable_argocd_finalizer
+
+  # Git repository configuration
+  git_repo_url        = var.git_repo_url
+  git_target_revision = var.git_target_revision
+  helm_chart_path     = var.helm_chart_path
+  helm_value_files    = var.helm_value_files
+
+  # Container images
+  backend_image_repository  = var.backend_image_repository
+  backend_image_tag         = var.backend_image_tag
+  frontend_image_repository = var.frontend_image_repository
+  frontend_image_tag        = var.frontend_image_tag
+
+  # Ingress configuration
+  enable_ingress = var.enable_app_ingress
+  ingress_host   = var.ingress_host
+  enable_tls     = var.enable_tls
+  cluster_issuer = var.cluster_issuer
+
+  # Sync configuration
+  enable_auto_sync    = var.enable_auto_sync
+  auto_sync_prune     = var.auto_sync_prune
+  auto_sync_self_heal = var.auto_sync_self_heal
+
+  tags = var.tags
+
+  depends_on = [module.kubernetes_addons, module.database]
+}

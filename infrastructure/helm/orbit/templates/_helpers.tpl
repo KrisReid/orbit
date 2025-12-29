@@ -108,13 +108,24 @@ Frontend image
 {{- end }}
 
 {{/*
-Database URL
+Database URL - constructs the connection string from components
 */}}
 {{- define "orbit.databaseUrl" -}}
 {{- if .Values.externalDatabase.enabled }}
 {{- printf "postgresql+asyncpg://%s:$(DATABASE_PASSWORD)@%s:%d/%s" .Values.externalDatabase.username .Values.externalDatabase.host (int .Values.externalDatabase.port) .Values.externalDatabase.database }}
 {{- else }}
 {{- printf "postgresql+asyncpg://%s:$(DATABASE_PASSWORD)@%s-postgresql:5432/%s" .Values.postgresql.auth.username (include "orbit.fullname" .) .Values.postgresql.auth.database }}
+{{- end }}
+{{- end }}
+
+{{/*
+Check if using full connection string from secret
+*/}}
+{{- define "orbit.database.useConnectionString" -}}
+{{- if and .Values.externalDatabase.enabled .Values.externalDatabase.existingSecretConnectionStringKey }}
+{{- "true" }}
+{{- else }}
+{{- "" }}
 {{- end }}
 {{- end }}
 
@@ -130,7 +141,7 @@ Secret name for backend
 {{- end }}
 
 {{/*
-Secret name for database password
+Secret name for database credentials
 */}}
 {{- define "orbit.database.secretName" -}}
 {{- if .Values.externalDatabase.enabled }}
@@ -151,10 +162,17 @@ Secret name for database password
 {{/*
 Secret key for database password
 */}}
-{{- define "orbit.database.secretKey" -}}
+{{- define "orbit.database.passwordKey" -}}
 {{- if .Values.externalDatabase.enabled }}
   {{- .Values.externalDatabase.existingSecretPasswordKey | default "password" }}
 {{- else }}
   {{- .Values.postgresql.auth.secretKeys.userPasswordKey | default "password" }}
 {{- end }}
+{{- end }}
+
+{{/*
+Secret key for full database connection string (when provided)
+*/}}
+{{- define "orbit.database.connectionStringKey" -}}
+{{- .Values.externalDatabase.existingSecretConnectionStringKey | default "DATABASE_URL" }}
 {{- end }}

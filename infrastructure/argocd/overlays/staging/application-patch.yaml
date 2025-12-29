@@ -9,7 +9,76 @@ spec:
     helm:
       valueFiles:
         - values.yaml
-        - ../../argocd/values/common.yaml
-        - ../../argocd/values/staging.yaml
+      # Staging-specific values inline
+      values: |
+        # =============================================================================
+        # Staging Environment Values
+        # =============================================================================
+        
+        backend:
+          replicaCount: 1
+          
+          image:
+            repository: ghcr.io/your-org/orbit-backend
+            pullPolicy: Always  # Always pull latest for staging
+          
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          autoscaling:
+            enabled: false
+
+          env:
+            DEBUG: "true"
+
+        frontend:
+          replicaCount: 1
+          
+          image:
+            repository: ghcr.io/your-org/orbit-frontend
+            pullPolicy: Always
+
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+
+          autoscaling:
+            enabled: false
+
+        ingress:
+          enabled: true
+          className: nginx
+          host: staging.orbit.example.com  # Override this!
+          
+          annotations:
+            cert-manager.io/cluster-issuer: letsencrypt-staging
+            nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          
+          tls:
+            enabled: true
+            secretName: orbit-staging-tls
+
+        # Use external database (Cloud SQL/RDS provisioned by Terraform)
+        postgresql:
+          enabled: false
+
+        externalDatabase:
+          enabled: true
+          existingSecret: "orbit-db-credentials"
+          # Use full connection string from External Secrets
+          existingSecretConnectionStringKey: "DATABASE_URL"
+
+        podDisruptionBudget:
+          enabled: false
+
   destination:
     namespace: orbit-staging

@@ -9,8 +9,84 @@ spec:
     helm:
       valueFiles:
         - values.yaml
-        - values-production.yaml 
-        - ../../argocd/values/common.yaml
-        - ../../argocd/values/production.yaml
+      # Production-specific values inline
+      values: |
+        # =============================================================================
+        # Production Environment Values
+        # =============================================================================
+        
+        backend:
+          replicaCount: 2
+          
+          image:
+            repository: ghcr.io/your-org/orbit-backend
+            pullPolicy: IfNotPresent
+          
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+          autoscaling:
+            enabled: true
+            minReplicas: 2
+            maxReplicas: 10
+            targetCPUUtilizationPercentage: 70
+            targetMemoryUtilizationPercentage: 80
+
+          env:
+            DEBUG: "false"
+
+        frontend:
+          replicaCount: 2
+          
+          image:
+            repository: ghcr.io/your-org/orbit-frontend
+            pullPolicy: IfNotPresent
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+          autoscaling:
+            enabled: true
+            minReplicas: 2
+            maxReplicas: 5
+            targetCPUUtilizationPercentage: 70
+
+        ingress:
+          enabled: true
+          className: nginx
+          host: orbit.example.com  # Override this!
+          
+          annotations:
+            cert-manager.io/cluster-issuer: letsencrypt-prod
+            nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          
+          tls:
+            enabled: true
+            secretName: orbit-tls
+
+        # Use external database (Cloud SQL/RDS provisioned by Terraform)
+        postgresql:
+          enabled: false
+
+        externalDatabase:
+          enabled: true
+          existingSecret: "orbit-db-credentials"
+          # Use full connection string from External Secrets
+          existingSecretConnectionStringKey: "DATABASE_URL"
+
+        podDisruptionBudget:
+          enabled: true
+          minAvailable: 1
+
   destination:
     namespace: orbit-production

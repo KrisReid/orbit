@@ -199,16 +199,28 @@ postgresql:
 # -----------------------------------------------------------------------------
 # External Database Configuration
 # -----------------------------------------------------------------------------
-# Use this instead of the built-in PostgreSQL
+# Use this instead of the built-in PostgreSQL for cloud deployments.
+# Two modes are supported:
+#
+# Mode 1: Provide connection components (host, port, database, username)
+#         with password from existingSecret using existingSecretPasswordKey
+#
+# Mode 2: Provide a full DATABASE_URL connection string from existingSecret
+#         using existingSecretConnectionStringKey (set this to enable)
+#
 externalDatabase:
   enabled: false
+  # Connection components (Mode 1)
   host: ""
   port: 5432
   database: orbit
   username: orbit
-  password: ""
+  # Secret containing credentials
   existingSecret: ""
   existingSecretPasswordKey: "password"
+  # Set this to use a full connection string from secret instead (Mode 2)
+  # When set, host/port/database/username are ignored
+  existingSecretConnectionStringKey: ""
 
 # -----------------------------------------------------------------------------
 # Service Account

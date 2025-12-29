@@ -58,3 +58,8 @@ output "secret_arn" {
   description = "The ARN of the Secrets Manager secret"
   value       = var.create_secret ? aws_secretsmanager_secret.db_password[0].arn : null
 }
+
+output "secret_name" {
+  description = "The name of the Secrets Manager secret"
+  value       = var.create_secret ? aws_secretsmanager_secret.db_password[0].name : null
+}

@@ -43,13 +43,23 @@ spec:
               containerPort: 8000
               protocol: TCP
           env:
+            {{- if include "orbit.database.useConnectionString" . }}
+            # Using full connection string from secret (e.g., from External Secrets)
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "orbit.database.secretName" . | trim }}
+                  key: {{ include "orbit.database.connectionStringKey" . | trim }}
+            {{- else }}
+            # Constructing DATABASE_URL from components
             - name: DATABASE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "orbit.database.secretName" . }}
-                  key: {{ include "orbit.database.secretKey" . }}
+                  name: {{ include "orbit.database.secretName" . | trim }}
+                  key: {{ include "orbit.database.passwordKey" . | trim }}
             - name: DATABASE_URL
               value: {{ include "orbit.databaseUrl" . }}
+            {{- end }}
             - name: SECRET_KEY
               valueFrom:
                 secretKeyRef:

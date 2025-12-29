@@ -8,6 +8,7 @@
 #
 # Or use the overlay for your environment:
 #   kustomize build argocd/overlays/production | kubectl apply -f -
+#   kustomize build argocd/overlays/staging | kubectl apply -f -
 # =============================================================================
 
 apiVersion: argoproj.io/v1alpha1
@@ -27,10 +28,9 @@ spec:
 
     helm:
       releaseName: orbit
+      # Only use the base values.yaml - environment overrides come from overlays
       valueFiles:
         - values.yaml
-        - values-production.yaml
-        - ../../argocd/values/common.yaml
 
   destination:
     server: https://kubernetes.default.svc
