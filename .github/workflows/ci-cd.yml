@@ -1,134 +1,231 @@
+# =============================================================================
+# Orbit CI/CD Pipeline
+# =============================================================================
+# CI: Runs on all pull requests and pushes to main
+# CD: Builds and pushes images to Google Artifact Registry on main branch,
+#     then updates ArgoCD overlay to trigger deployment
+# =============================================================================
+
 name: CI/CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+  # GCP Configuration - set these as repository variables
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION }}
+  GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY || 'orbit' }}
 
 jobs:
-  test-backend:
+  # ===========================================================================
+  # Backend Tests & Linting
+  # ===========================================================================
+  backend:
+    name: Backend
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
     services:
       postgres:
-        image: postgres:13
+        image: postgres:16-alpine
         env:
-          POSTGRES_USER: pytest
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: pytest
-        ports:
-          - 5432:5432
+          POSTGRES_USER: orbit_test
+          POSTGRES_PASSWORD: orbit_test_password
+          POSTGRES_DB: orbit_test
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install -r requirements.txt
           pip install ruff
+
       - name: Lint with Ruff
-        run: |
-          cd backend
-          ruff check .
+        run: ruff check .
+
       - name: Format check with Ruff
-        run: |
-          cd backend
-          ruff format --check .
+        run: ruff format --check .
+
       - name: Run tests
         env:
-          DATABASE_URL: "postgresql://pytest:password@localhost:5432/pytest"
-        run: |
-          cd backend
-          pytest
+          DATABASE_URL: postgresql+asyncpg://orbit_test:orbit_test_password@localhost:5432/orbit_test
+          SECRET_KEY: test-secret-key-for-ci
+          DEBUG: "true"
+        run: pytest -v --tb=short
 
-  test-frontend:
+  # ===========================================================================
+  # Frontend Tests, Type Checking & Linting
+  # ===========================================================================
+  frontend:
+    name: Frontend
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install dependencies
-        run: |
-          cd frontend
-          npm ci
-      - name: Run checks
-        run: |
-          cd frontend
-          npm run lint
-          npm run typecheck
-          npm test -- --run
-          npm run build
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test -- --run
+
+      - name: Build
+        run: npm run build
+
+  # ===========================================================================
+  # Build & Push to Google Artifact Registry (main branch only)
+  # ===========================================================================
   build-and-push:
+    name: Build & Push Images
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    needs: [test-backend, test-frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [backend, frontend]
     permissions:
-      packages: write
       contents: read
+      id-token: write  # Required for Workload Identity Federation
+
+    outputs:
+      image_tag: ${{ steps.meta.outputs.sha_short }}
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "registry=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}" >> $GITHUB_OUTPUT
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
           context: ./backend
+          file: ./backend/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}-backend:${{ github.sha }}
+          tags: |
+            ${{ steps.meta.outputs.registry }}/backend:${{ steps.meta.outputs.sha_short }}
+            ${{ steps.meta.outputs.registry }}/backend:latest
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
+
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
+          file: ./frontend/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}-frontend:${{ github.sha }}
+          tags: |
+            ${{ steps.meta.outputs.registry }}/frontend:${{ steps.meta.outputs.sha_short }}
+            ${{ steps.meta.outputs.registry }}/frontend:latest
+          build-args: |
+            VITE_API_URL=/api/v1
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
 
-  update-helm-values:
+  # ===========================================================================
+  # Update ArgoCD Overlay (triggers GitOps deployment)
+  # ===========================================================================
+  deploy:
+    name: Update ArgoCD Overlay
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     needs: build-and-push
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Update image tags in values files
+
+      - name: Update image tags in ArgoCD overlay
         run: |
-          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          echo "Updating image tags to $SHORT_SHA"
+          IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
+          OVERLAY_FILE="infrastructure/argocd/overlays/production/application-patch.yaml"
           
-          find infrastructure/helm/orbit -type f -name "values*.yaml" | while read -r file; do
-            echo "Processing $file"
-            sed -i "s/\(repository: ghcr\.io\/${{ github.repository }}-backend\s*\n\s*tag:\s*\).*/\1\"$SHORT_SHA\" # AUTO-UPDATED/" "$file"
-            sed -i "s/\(repository: ghcr\.io\/${{ github.repository }}-frontend\s*\n\s*tag:\s*\).*/\1\"$SHORT_SHA\" # AUTO-UPDATED/" "$file"
-          done
+          echo "Updating image tags to: $IMAGE_TAG"
+          
+          # The values are embedded as a multiline string, so we use sed to update the tag lines
+          # This matches the pattern: "    tag: <anything>" and replaces with the new tag
+          sed -i 's/^\([[:space:]]*tag:\)[[:space:]]*.*/\1 "'"$IMAGE_TAG"'"/' "$OVERLAY_FILE"
+          
+          echo "Updated overlay file:"
+          cat "$OVERLAY_FILE"
+
       - name: Commit and push changes
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add infrastructure/helm/orbit/values.yaml infrastructure/helm/orbit/values-production.yaml
-          git commit -m "ci: update image tags to ${{ github.sha }} [skip ci]" || echo "No changes to commit"
-          git push
+          
+          git add infrastructure/argocd/overlays/production/application-patch.yaml
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "deploy: update images to ${{ needs.build-and-push.outputs.image_tag }} [skip ci]"
+            git push
+          fi
