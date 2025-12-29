@@ -25,11 +25,38 @@ resource "kubernetes_namespace_v1" "application" {
     }
   }
 
+  # Wait longer for namespace deletion (ArgoCD may have deployed resources)
+  timeouts {
+    delete = "10m"
+  }
+
   lifecycle {
     ignore_changes = [
       metadata[0].annotations,
       metadata[0].labels,
     ]
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Pre-delete cleanup for namespace
+# Deletes all resources in the namespace before Terraform tries to delete it
+# This handles resources deployed by ArgoCD that Terraform doesn't manage
+# -----------------------------------------------------------------------------
+resource "null_resource" "namespace_cleanup" {
+  # Only run during destroy
+  triggers = {
+    namespace = var.application_namespace
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      echo "Cleaning up namespace ${self.triggers.namespace}..."
+      kubectl delete all --all -n ${self.triggers.namespace} --force --grace-period=0 2>/dev/null || true
+      kubectl delete pdb,secret,configmap,ingress,serviceaccount --all -n ${self.triggers.namespace} --force --grace-period=0 2>/dev/null || true
+      echo "Namespace cleanup complete"
+    EOT
   }
 }
 

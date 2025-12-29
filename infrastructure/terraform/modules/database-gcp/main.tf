@@ -128,6 +128,10 @@ resource "google_sql_user" "main" {
   instance = google_sql_database_instance.main.name
   password = local.db_password
 
+  # ABANDON on destroy - user may own database objects created by the app
+  # This prevents "cannot be dropped because some objects depend on it" errors
+  deletion_policy = "ABANDON"
+
   depends_on = [google_sql_database_instance.main]
 }
 

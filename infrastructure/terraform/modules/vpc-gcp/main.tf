@@ -138,4 +138,9 @@ resource "google_service_networking_connection" "private_services" {
   network                 = google_compute_network.main.id
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.private_services[0].name]
+
+  # Skip deletion - this connection is often still in use by deleted Cloud SQL
+  # instances that haven't fully released the peering. The connection will be
+  # automatically cleaned up when the VPC is deleted, or can be manually removed.
+  deletion_policy = "ABANDON"
 }
