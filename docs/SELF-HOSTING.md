@@ -119,10 +119,39 @@ Terraform creates:
 - VPC and networking
 - Kubernetes cluster (EKS or GKE)
 - Managed PostgreSQL database (RDS or Cloud SQL)
+- Container registry (Artifact Registry for GKE, ECR for EKS)
 - ArgoCD installation
 - External Secrets Operator with database credentials
+- GitHub Actions Workload Identity Federation (for CI/CD)
 
-### Step 3: Deploy Application with ArgoCD
+### Step 3: Configure GitHub Actions CI/CD
+
+Terraform outputs the GitHub secrets you need:
+
+```bash
+# Get the values for GitHub secrets
+terraform output github_actions_workload_identity_provider
+terraform output github_actions_service_account
+```
+
+Configure these in your GitHub repository (Settings → Secrets and variables → Actions):
+
+**Secrets:**
+- `GCP_WORKLOAD_IDENTITY_PROVIDER` - Value from terraform output
+- `GCP_SERVICE_ACCOUNT` - Value from terraform output
+
+**Variables:**
+- `GCP_PROJECT_ID` - Your GCP project ID (e.g., `gen-lang-client-0354936138`)
+- `GCP_REGION` - Your GCP region (e.g., `europe-west2`)
+- `GAR_REPOSITORY` - Your Artifact Registry repository name (default: `orbit`)
+
+The CI/CD pipeline will now automatically:
+1. Run tests on pull requests
+2. Build and push images to Artifact Registry on main branch merges
+3. Update the ArgoCD overlay with new image tags
+4. ArgoCD syncs the deployment automatically
+
+### Step 4: Deploy Application with ArgoCD
 
 **Important:** Run these commands from the project root directory (orbit/), not from the terraform directory.
 
@@ -147,7 +176,7 @@ kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
 kubectl get applications -n argocd
 ```
 
-### Step 4: Configure DNS
+### Step 5: Configure DNS
 
 Point your domain to the ingress controller:
 
@@ -158,7 +187,7 @@ kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.
 
 Create a DNS A record (or CNAME) pointing your domain to this address.
 
-### Step 5: Access ArgoCD UI (Optional)
+### Step 6: Access ArgoCD UI (Optional)
 
 ```bash
 # Get admin password
