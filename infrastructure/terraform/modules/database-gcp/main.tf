@@ -14,8 +14,19 @@ resource "random_password" "db_password" {
 }
 
 locals {
-  db_password = var.password != null ? var.password : random_password.db_password[0].result
+  password_from_secret = var.password_secret_id != null ? data.google_secret_manager_secret_version.password[0].secret_data : null
+  db_password          = coalesce(var.password, local.password_from_secret, random_password.db_password[0].result)
 }
+
+# -----------------------------------------------------------------------------
+# Data source for existing secret
+# -----------------------------------------------------------------------------
+data "google_secret_manager_secret_version" "password" {
+  count   = var.password_secret_id != null ? 1 : 0
+  project = var.project_id
+  secret  = var.password_secret_id
+}
+
 
 # -----------------------------------------------------------------------------
 # Cloud SQL Instance

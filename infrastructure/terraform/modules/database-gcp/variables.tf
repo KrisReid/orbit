@@ -215,6 +215,12 @@ variable "create_secret" {
   default     = true
 }
 
+variable "password_secret_id" {
+  description = "ID of an existing Secret Manager secret to use for the password. If provided, 'password' and 'create_secret' are ignored."
+  type        = string
+  default     = null
+}
+
 # -----------------------------------------------------------------------------
 # Labels & Protection
 # -----------------------------------------------------------------------------
