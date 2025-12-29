@@ -1,17 +1,40 @@
 # =============================================================================
 # GitOps GCP Module
 # =============================================================================
-# Sets up the GitOps pipeline for GKE:
-# - SecretStore pointing to GCP Secret Manager
-# - ExternalSecret that syncs database credentials
-# - ArgoCD Application that deploys Orbit
+# Bootstraps the GitOps pipeline for GKE:
+# - ClusterSecretStore pointing to GCP Secret Manager
+# - ExternalSecret that syncs database credentials to Kubernetes
+# - Application namespace
+#
+# Note: The ArgoCD Application is NOT created here - it should be applied
+# via GitOps using the overlays in infrastructure/argocd/overlays/
 #
 # Note: The GCP Service Account for External Secrets and Workload Identity
 # binding should be created in the calling module to avoid dependency cycles.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
-# SecretStore - Points to GCP Secret Manager
+# Application Namespace
+# -----------------------------------------------------------------------------
+resource "kubernetes_namespace_v1" "application" {
+  metadata {
+    name = var.application_namespace
+    labels = {
+      "app.kubernetes.io/managed-by" = "terraform"
+      "app.kubernetes.io/part-of"    = "orbit"
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      metadata[0].annotations,
+      metadata[0].labels,
+    ]
+  }
+}
+
+# -----------------------------------------------------------------------------
+# ClusterSecretStore - Points to GCP Secret Manager
 # -----------------------------------------------------------------------------
 resource "kubectl_manifest" "secret_store" {
   yaml_body = yamlencode({
@@ -66,7 +89,7 @@ resource "kubectl_manifest" "database_external_secret" {
           type = "Opaque"
           data = {
             # Full connection string for the backend
-            DATABASE_URL = "postgresql://${var.database_user}:{{ .db_password }}@${var.database_host}:5432/${var.database_name}"
+            DATABASE_URL = "postgresql+asyncpg://${var.database_user}:{{ .db_password }}@${var.database_host}:5432/${var.database_name}"
             # Individual components if needed
             DB_HOST     = var.database_host
             DB_PORT     = "5432"
@@ -89,106 +112,4 @@ resource "kubectl_manifest" "database_external_secret" {
   })
 
   depends_on = [kubectl_manifest.secret_store, kubernetes_namespace_v1.application]
-}
-
-# -----------------------------------------------------------------------------
-# ArgoCD Application - Deploys Orbit via Helm
-# -----------------------------------------------------------------------------
-resource "kubectl_manifest" "argocd_application" {
-  count = var.deploy_argocd_application ? 1 : 0
-
-  yaml_body = yamlencode({
-    apiVersion = "argoproj.io/v1alpha1"
-    kind       = "Application"
-    metadata = {
-      name       = "orbit"
-      namespace  = var.argocd_namespace
-      finalizers = var.enable_argocd_finalizer ? ["resources-finalizer.argocd.argoproj.io"] : []
-    }
-    spec = {
-      project = "default"
-      source = {
-        repoURL        = var.git_repo_url
-        targetRevision = var.git_target_revision
-        path           = var.helm_chart_path
-        helm = {
-          valueFiles = var.helm_value_files
-          values = yamlencode({
-            # Override values that need to come from Terraform
-            backend = {
-              image = {
-                repository = var.backend_image_repository
-                tag        = var.backend_image_tag
-              }
-              existingSecret = "orbit-db-credentials"
-              secretKeys = {
-                databaseUrl = "DATABASE_URL"
-              }
-            }
-            frontend = {
-              image = {
-                repository = var.frontend_image_repository
-                tag        = var.frontend_image_tag
-              }
-            }
-            ingress = {
-              enabled   = var.enable_ingress
-              className = "nginx"
-              annotations = {
-                "cert-manager.io/cluster-issuer" = var.cluster_issuer
-              }
-              host = var.ingress_host
-              tls = {
-                enabled    = var.enable_tls
-                secretName = "orbit-tls"
-              }
-            }
-            # Disable built-in PostgreSQL since we use Cloud SQL
-            postgresql = {
-              enabled = false
-            }
-          })
-        }
-      }
-      destination = {
-        server    = "https://kubernetes.default.svc"
-        namespace = var.application_namespace
-      }
-      syncPolicy = var.enable_auto_sync ? {
-        automated = {
-          prune    = var.auto_sync_prune
-          selfHeal = var.auto_sync_self_heal
-        }
-        syncOptions = [
-          "CreateNamespace=true"
-        ]
-        } : {
-        automated = null
-        syncOptions = [
-          "CreateNamespace=true"
-        ]
-      }
-    }
-  })
-
-  depends_on = [kubectl_manifest.database_external_secret]
-}
-
-# -----------------------------------------------------------------------------
-# Create application namespace if it doesn't exist
-# -----------------------------------------------------------------------------
-resource "kubernetes_namespace_v1" "application" {
-  metadata {
-    name = var.application_namespace
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
-    }
-  }
-
-  lifecycle {
-    ignore_changes = [
-      metadata[0].annotations,
-      metadata[0].labels,
-    ]
-  }
 }

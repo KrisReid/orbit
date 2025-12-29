@@ -1,15 +1,34 @@
+# =============================================================================
+# Orbit ArgoCD Application - Staging Overlay
+# =============================================================================
+# Staging-specific configuration for Orbit deployment.
+#
+# Usage:
+#   kustomize build infrastructure/argocd/overlays/staging | kubectl apply -f -
+#
+# Configuration checklist:
+#   [ ] Update source.repoURL to your repository
+#   [ ] Update ingress.host to your staging domain
+#   [ ] Update image repositories to your container registry
+#   [ ] Ensure ExternalSecret "orbit-db-credentials" exists (created by Terraform)
+# =============================================================================
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: orbit
+  name: orbit-staging
   namespace: argocd
 spec:
   source:
-    targetRevision: develop  # Use develop branch for staging
+    # UPDATE THIS: Your Git repository URL
+    repoURL: https://github.com/YOUR_ORG/orbit.git
+    targetRevision: develop  # Staging branch
+
     helm:
       valueFiles:
         - values.yaml
-      # Staging-specific values inline
+
+      # Staging-specific values
       values: |
         # =============================================================================
         # Staging Environment Values
@@ -19,7 +38,9 @@ spec:
           replicaCount: 1
           
           image:
-            repository: ghcr.io/your-org/orbit-backend
+            # UPDATE THIS: Your container registry
+            repository: ghcr.io/YOUR_ORG/orbit-backend
+            tag: latest
             pullPolicy: Always  # Always pull latest for staging
           
           resources:
@@ -40,7 +61,9 @@ spec:
           replicaCount: 1
           
           image:
-            repository: ghcr.io/your-org/orbit-frontend
+            # UPDATE THIS: Your container registry
+            repository: ghcr.io/YOUR_ORG/orbit-frontend
+            tag: latest
             pullPolicy: Always
 
           resources:
@@ -57,7 +80,8 @@ spec:
         ingress:
           enabled: true
           className: nginx
-          host: staging.orbit.example.com  # Override this!
+          # UPDATE THIS: Your staging domain
+          host: staging.orbit.example.com
           
           annotations:
             cert-manager.io/cluster-issuer: letsencrypt-staging
@@ -67,14 +91,13 @@ spec:
             enabled: true
             secretName: orbit-staging-tls
 
-        # Use external database (Cloud SQL/RDS provisioned by Terraform)
+        # Use external database (RDS/CloudSQL provisioned by Terraform)
         postgresql:
           enabled: false
 
         externalDatabase:
           enabled: true
           existingSecret: "orbit-db-credentials"
-          # Use full connection string from External Secrets
           existingSecretConnectionStringKey: "DATABASE_URL"
 
         podDisruptionBudget:

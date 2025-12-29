@@ -63,22 +63,6 @@ output "database_address" {
   value       = module.database.instance_address
 }
 
-# -----------------------------------------------------------------------------
-# Database Connection Info (for ArgoCD/Helm values)
-# -----------------------------------------------------------------------------
-# These outputs provide the database connection information needed
-# for ArgoCD to configure the Orbit Helm chart with external database settings.
-#
-# Example usage in ArgoCD values:
-#   externalDatabase:
-#     enabled: true
-#     host: <database_host output>
-#     port: 5432
-#     database: <database_name output>
-#     username: <database_user output>
-#     existingSecret: "orbit-db-secret"
-#     existingSecretPasswordKey: "password"
-# -----------------------------------------------------------------------------
 output "database_host" {
   description = "Database host for Orbit application configuration"
   value       = module.database.instance_address
@@ -131,51 +115,45 @@ output "gitops_kubernetes_secret_name" {
   value       = var.enable_gitops_bootstrap ? module.gitops[0].kubernetes_secret_name : null
 }
 
-output "gitops_argocd_application_name" {
-  description = "Name of the ArgoCD Application"
-  value       = var.enable_gitops_bootstrap ? module.gitops[0].argocd_application_name : null
-}
-
 output "gitops_external_secrets_role_arn" {
   description = "IAM role ARN for External Secrets Operator"
   value       = var.enable_gitops_bootstrap ? module.gitops[0].external_secrets_role_arn : null
 }
 
+output "application_namespace" {
+  description = "Namespace where the Orbit application will be deployed"
+  value       = var.enable_gitops_bootstrap ? module.gitops[0].application_namespace : var.application_namespace
+}
+
 # -----------------------------------------------------------------------------
 # Quick Start Instructions
 # -----------------------------------------------------------------------------
-locals {
-  gitops_enabled_message = <<-EOT
+output "next_steps" {
+  description = "Instructions for accessing your deployment"
+  value       = <<-EOT
     
     ✅ Infrastructure deployed successfully!
     
-    Your Orbit application is being deployed via ArgoCD.
+    Next steps to deploy the Orbit application:
     
     1. Configure kubectl:
-       ${module.eks.kubeconfig_command}
+       aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.region}
     
-    2. Check ArgoCD Application status:
-       kubectl get applications -n ${var.argocd_namespace}
+    2. Deploy the ArgoCD Application (GitOps):
+       kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
     
-    3. Get ArgoCD admin password:
-       kubectl -n ${var.argocd_namespace} get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+    3. Check ArgoCD Application status:
+       kubectl get applications -n argocd
     
-    4. Access ArgoCD UI:
-       kubectl port-forward svc/argocd-server -n ${var.argocd_namespace} 8080:443
+    4. Get ArgoCD admin password:
+       kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+    
+    5. Access ArgoCD UI:
+       kubectl port-forward svc/argocd-server -n argocd 8080:443
        Then open: https://localhost:8080
-    
-    5. Your application will be available at:
-       https://${var.ingress_host}
     
     Database credentials are automatically synced from AWS Secrets Manager
     to Kubernetes via External Secrets Operator.
     
   EOT
-
-  gitops_disabled_message = "GitOps bootstrap not enabled. Set enable_gitops_bootstrap = true to deploy the application."
-}
-
-output "next_steps" {
-  description = "Instructions for accessing your deployment"
-  value       = var.enable_gitops_bootstrap ? local.gitops_enabled_message : local.gitops_disabled_message
 }

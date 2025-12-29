@@ -516,7 +516,7 @@ terraform {
 }
 ```
 
-For more details, see the [Terraform README](../infrastructure/terraform/README.md).
+For more details, see the [Infrastructure README](../infrastructure/README.md).
 
 ---
 
@@ -526,109 +526,82 @@ For enterprise teams using GitOps workflows with ArgoCD.
 
 ### Prerequisites
 
-- **Kubernetes:** 1.25+
-- **ArgoCD:** 2.8+ installed on the cluster
+- **Kubernetes:** 1.25+ (EKS or GKE recommended)
+- **Terraform:** Infrastructure provisioned using `infrastructure/terraform/environments/eks` or `gke`
 - **Git repository:** Fork of Orbit or your own repo
 
-### Setup ArgoCD Application
+### Recommended Deployment Flow
 
-#### Option 1: Apply directly
+The recommended approach separates infrastructure provisioning from application deployment:
+
+1. **Terraform** provisions infrastructure (VPC, Kubernetes, Database, ArgoCD, External Secrets)
+2. **ArgoCD** manages application deployments (syncs from Git)
+
+### Step 1: Deploy Infrastructure with Terraform
 
 ```bash
+# For EKS
+cd infrastructure/terraform/environments/eks
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values
+terraform init && terraform apply
+
+# For GKE
+cd infrastructure/terraform/environments/gke
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your values
+terraform init && terraform apply
+```
+
+This creates:
+- VPC and networking
+- Kubernetes cluster
+- Managed database (RDS/CloudSQL)
+- ArgoCD installation
+- External Secrets Operator with cloud IAM integration
+- ClusterSecretStore and ExternalSecret for database credentials
+
+### Step 2: Deploy Application with ArgoCD
+
+```bash
+# Edit the overlay with your configuration
+vi infrastructure/argocd/overlays/production/application-patch.yaml
+
+# Update these values:
+# - source.repoURL: Your Git repository URL
+# - ingress.host: Your production domain
+# - image repositories: Your container registry
+
 # Apply the ArgoCD Application
-kubectl apply -f infrastructure/argocd/base/application.yaml
-```
-
-#### Option 2: Using Kustomize overlays
-
-For environment-specific deployments:
-
-```bash
-# Production
 kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
-
-# Staging
-kustomize build infrastructure/argocd/overlays/staging | kubectl apply -f -
-```
-
-### Configure Values
-
-Edit the values files for your environment:
-
-**Production (`infrastructure/argocd/values/production.yaml`):**
-```yaml
-ingress:
-  host: orbit.yourcompany.com  # <-- Change this
-
-postgresql:
-  auth:
-    existingSecret: orbit-db-credentials  # <-- Create this secret
-```
-
-**Staging (`infrastructure/argocd/values/staging.yaml`):**
-```yaml
-ingress:
-  host: staging.orbit.yourcompany.com  # <-- Change this
 ```
 
 ### Secrets Management
 
-ArgoCD doesn't sync secrets by default. Use one of these approaches:
+Database credentials are automatically synced from cloud secret managers:
 
-**Option A: External Secrets Operator**
-```yaml
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: orbit-secrets
-  namespace: orbit
-spec:
-  secretStoreRef:
-    name: aws-secrets-manager
-    kind: ClusterSecretStore
-  target:
-    name: orbit-backend
-  data:
-    - secretKey: SECRET_KEY
-      remoteRef:
-        key: orbit/production
-        property: secret_key
-```
+- **AWS:** Secrets Manager → External Secrets Operator → Kubernetes Secret
+- **GCP:** Secret Manager → External Secrets Operator → Kubernetes Secret
 
-**Option B: Sealed Secrets**
-```bash
-# Seal your secret
-kubeseal --format yaml < secret.yaml > sealed-secret.yaml
-
-# Add to git repository
-git add sealed-secret.yaml
-git commit -m "Add sealed secrets"
-git push
-```
-
-**Option C: Manual Secret Creation**
-```bash
-kubectl create secret generic orbit-backend \
-  --namespace orbit \
-  --from-literal=SECRET_KEY=$(openssl rand -base64 32)
-```
+The Terraform gitops modules create:
+1. `ClusterSecretStore` pointing to the cloud secret manager
+2. `ExternalSecret` that syncs database credentials to `orbit-db-credentials`
 
 ### GitOps Workflow
 
-1. **Make changes** to values files in git
-2. **Commit and push** to your repository
-3. **ArgoCD detects changes** and syncs automatically (if auto-sync enabled)
-4. **Monitor sync status** in ArgoCD UI or CLI
+1. **Push changes** to your repository (main branch for production, develop for staging)
+2. **ArgoCD detects changes** and syncs automatically
+3. **Monitor sync status** in ArgoCD UI or CLI
 
 ```bash
 # Check application status
+kubectl get applications -n argocd
+
+# View detailed status
 argocd app get orbit
 
 # Sync manually if needed
 argocd app sync orbit
-
-# View sync history
-argocd app history orbit
 ```
 
 ### Multi-Environment Setup
@@ -638,18 +611,16 @@ infrastructure/argocd/
 ├── base/
 │   ├── application.yaml      # Base ArgoCD Application
 │   └── kustomization.yaml
-├── overlays/
-│   ├── production/
-│   │   ├── application-patch.yaml
-│   │   └── kustomization.yaml
-│   └── staging/
-│       ├── application-patch.yaml
-│       └── kustomization.yaml
-└── values/
-    ├── common.yaml           # Shared values
-    ├── production.yaml       # Production overrides
-    └── staging.yaml          # Staging overrides
+└── overlays/
+    ├── production/           # Production (main branch)
+    │   ├── application-patch.yaml
+    │   └── kustomization.yaml
+    └── staging/              # Staging (develop branch)
+        ├── application-patch.yaml
+        └── kustomization.yaml
 ```
+
+For detailed infrastructure documentation, see the [Infrastructure README](../infrastructure/README.md).
 
 ---
 

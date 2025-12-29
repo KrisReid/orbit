@@ -18,11 +18,6 @@ output "kubernetes_secret_name" {
 }
 
 output "application_namespace" {
-  description = "Namespace where the application is deployed"
+  description = "Namespace where the application will be deployed"
   value       = var.application_namespace
-}
-
-output "argocd_application_name" {
-  description = "Name of the ArgoCD Application"
-  value       = var.deploy_argocd_application ? "orbit" : null
 }

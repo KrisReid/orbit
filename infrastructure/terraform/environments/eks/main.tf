@@ -1,7 +1,18 @@
 # =============================================================================
 # Orbit EKS Environment
 # =============================================================================
-# Complete infrastructure and application deployment for Amazon Elastic Kubernetes Service.
+# Complete infrastructure deployment for Amazon Elastic Kubernetes Service.
+#
+# This Terraform configuration provisions:
+# - VPC networking with public/private subnets
+# - EKS cluster with managed node groups
+# - RDS PostgreSQL database
+# - Kubernetes addons (nginx-ingress, cert-manager, ArgoCD, External Secrets)
+# - GitOps bootstrap (ClusterSecretStore, ExternalSecret, application namespace)
+#
+# After `terraform apply`:
+# 1. Configure kubectl with the output command
+# 2. Apply ArgoCD Application: kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -114,7 +125,7 @@ module "kubernetes_addons" {
 
   # External Secrets Operator
   enable_external_secrets = var.enable_external_secrets
-  external_secrets_service_account_annotations = var.enable_external_secrets ? {
+  external_secrets_service_account_annotations = var.enable_external_secrets && var.enable_gitops_bootstrap ? {
     "eks.amazonaws.com/role-arn" = module.gitops[0].external_secrets_role_arn
   } : {}
 
@@ -122,7 +133,7 @@ module "kubernetes_addons" {
 }
 
 # -----------------------------------------------------------------------------
-# GitOps Bootstrap (External Secrets + ArgoCD Application)
+# GitOps Bootstrap (ClusterSecretStore + ExternalSecret + Namespace)
 # -----------------------------------------------------------------------------
 module "gitops" {
   source = "../../modules/gitops-aws"
@@ -149,34 +160,6 @@ module "gitops" {
 
   # Application configuration
   application_namespace = var.application_namespace
-
-  # ArgoCD configuration
-  argocd_namespace          = var.argocd_namespace
-  deploy_argocd_application = var.deploy_argocd_application
-  enable_argocd_finalizer   = var.enable_argocd_finalizer
-
-  # Git repository configuration
-  git_repo_url        = var.git_repo_url
-  git_target_revision = var.git_target_revision
-  helm_chart_path     = var.helm_chart_path
-  helm_value_files    = var.helm_value_files
-
-  # Container images
-  backend_image_repository  = var.backend_image_repository
-  backend_image_tag         = var.backend_image_tag
-  frontend_image_repository = var.frontend_image_repository
-  frontend_image_tag        = var.frontend_image_tag
-
-  # Ingress configuration
-  enable_ingress = var.enable_app_ingress
-  ingress_host   = var.ingress_host
-  enable_tls     = var.enable_tls
-  cluster_issuer = var.cluster_issuer
-
-  # Sync configuration
-  enable_auto_sync    = var.enable_auto_sync
-  auto_sync_prune     = var.auto_sync_prune
-  auto_sync_self_heal = var.auto_sync_self_heal
 
   tags = var.tags
 

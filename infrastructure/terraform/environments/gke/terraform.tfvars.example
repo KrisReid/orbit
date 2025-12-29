@@ -2,6 +2,9 @@
 # Orbit GKE Environment - Example Terraform Variables
 # =============================================================================
 # Copy this file to terraform.tfvars and customize for your environment.
+#
+# After running `terraform apply`, deploy the ArgoCD Application:
+#   kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -75,14 +78,9 @@ create_letsencrypt_issuers = true
 letsencrypt_email          = "admin@example.com"  # Required for Let's Encrypt
 
 # -----------------------------------------------------------------------------
-# ArgoCD Configuration
+# ArgoCD & External Secrets Configuration
 # -----------------------------------------------------------------------------
-enable_argocd    = true
-argocd_namespace = "argocd"
-
-# -----------------------------------------------------------------------------
-# External Secrets Configuration
-# -----------------------------------------------------------------------------
+enable_argocd                    = true
 enable_external_secrets          = true
 external_secrets_namespace       = "external-secrets"
 external_secrets_service_account = "external-secrets"
@@ -91,44 +89,9 @@ secret_refresh_interval          = "1h"
 # -----------------------------------------------------------------------------
 # GitOps Bootstrap Configuration
 # -----------------------------------------------------------------------------
-# Set to true to automatically deploy Orbit via ArgoCD with External Secrets
-enable_gitops_bootstrap   = true
-application_namespace     = "orbit"
-deploy_argocd_application = true
-enable_argocd_finalizer   = true
-
-# -----------------------------------------------------------------------------
-# Git Repository Configuration
-# -----------------------------------------------------------------------------
-# IMPORTANT: Update this to your forked/cloned repository URL
-git_repo_url        = "https://github.com/YOUR_ORG/orbit.git"
-git_target_revision = "main"
-helm_chart_path     = "infrastructure/helm/orbit"
-helm_value_files    = ["values.yaml", "values-production.yaml"]
-
-# -----------------------------------------------------------------------------
-# Container Images
-# -----------------------------------------------------------------------------
-# IMPORTANT: Update these to your container registry
-backend_image_repository  = "ghcr.io/YOUR_ORG/orbit-backend"
-backend_image_tag         = "latest"
-frontend_image_repository = "ghcr.io/YOUR_ORG/orbit-frontend"
-frontend_image_tag        = "latest"
-
-# -----------------------------------------------------------------------------
-# Application Ingress Configuration
-# -----------------------------------------------------------------------------
-enable_app_ingress = true
-ingress_host       = "orbit.example.com"  # Your domain
-enable_tls         = true
-cluster_issuer     = "letsencrypt-prod"   # Use "letsencrypt-staging" for testing
-
-# -----------------------------------------------------------------------------
-# ArgoCD Sync Configuration
-# -----------------------------------------------------------------------------
-enable_auto_sync    = true
-auto_sync_prune     = true
-auto_sync_self_heal = true
+# Creates ClusterSecretStore, ExternalSecret, and application namespace
+enable_gitops_bootstrap = true
+application_namespace   = "orbit"
 
 # -----------------------------------------------------------------------------
 # Labels & Protection

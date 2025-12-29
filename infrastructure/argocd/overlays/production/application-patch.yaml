@@ -1,3 +1,18 @@
+# =============================================================================
+# Orbit ArgoCD Application - Production Overlay
+# =============================================================================
+# Production-specific configuration for Orbit deployment.
+#
+# Usage:
+#   kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
+#
+# Configuration checklist:
+#   [ ] Update source.repoURL to your repository
+#   [ ] Update ingress.host to your production domain
+#   [ ] Update image repositories to your container registry
+#   [ ] Ensure ExternalSecret "orbit-db-credentials" exists (created by Terraform)
+# =============================================================================
+
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -5,11 +20,15 @@ metadata:
   namespace: argocd
 spec:
   source:
-    targetRevision: main  # Use main branch for production
+    # UPDATE THIS: Your Git repository URL
+    repoURL: https://github.com/YOUR_ORG/orbit.git
+    targetRevision: main  # Production branch
+
     helm:
       valueFiles:
         - values.yaml
-      # Production-specific values inline
+
+      # Production-specific values
       values: |
         # =============================================================================
         # Production Environment Values
@@ -19,7 +38,9 @@ spec:
           replicaCount: 2
           
           image:
-            repository: ghcr.io/your-org/orbit-backend
+            # UPDATE THIS: Your container registry
+            repository: ghcr.io/YOUR_ORG/orbit-backend
+            tag: latest  # Consider using specific versions in production
             pullPolicy: IfNotPresent
           
           resources:
@@ -44,7 +65,9 @@ spec:
           replicaCount: 2
           
           image:
-            repository: ghcr.io/your-org/orbit-frontend
+            # UPDATE THIS: Your container registry
+            repository: ghcr.io/YOUR_ORG/orbit-frontend
+            tag: latest
             pullPolicy: IfNotPresent
 
           resources:
@@ -64,7 +87,8 @@ spec:
         ingress:
           enabled: true
           className: nginx
-          host: orbit.example.com  # Override this!
+          # UPDATE THIS: Your production domain
+          host: orbit.example.com
           
           annotations:
             cert-manager.io/cluster-issuer: letsencrypt-prod
@@ -74,14 +98,13 @@ spec:
             enabled: true
             secretName: orbit-tls
 
-        # Use external database (Cloud SQL/RDS provisioned by Terraform)
+        # Use external database (RDS/CloudSQL provisioned by Terraform)
         postgresql:
           enabled: false
 
         externalDatabase:
           enabled: true
           existingSecret: "orbit-db-credentials"
-          # Use full connection string from External Secrets
           existingSecretConnectionStringKey: "DATABASE_URL"
 
         podDisruptionBudget:
@@ -89,4 +112,4 @@ spec:
           minAvailable: 1
 
   destination:
-    namespace: orbit-production
+    namespace: orbit

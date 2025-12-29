@@ -1,7 +1,10 @@
 # =============================================================================
-# Orbit EKS Environment - Example Configuration
+# Orbit EKS Environment - Example Terraform Variables
 # =============================================================================
-# Copy this file to terraform.tfvars and update with your values.
+# Copy this file to terraform.tfvars and customize for your environment.
+#
+# After running `terraform apply`, deploy the ArgoCD Application:
+#   kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -84,38 +87,20 @@ create_letsencrypt_issuers = true
 letsencrypt_email          = "admin@example.com"
 
 # -----------------------------------------------------------------------------
-# Orbit Application
+# ArgoCD & External Secrets Configuration
 # -----------------------------------------------------------------------------
-orbit_namespace = "orbit"
-# orbit_chart_path = "../../../helm/orbit"
+enable_argocd                    = true
+enable_external_secrets          = true
+external_secrets_namespace       = "external-secrets"
+external_secrets_service_account = "external-secrets"
+secret_refresh_interval          = "1h"
 
-backend_replica_count    = 2
-backend_image_repository = "ghcr.io/your-org/orbit-backend"
-backend_image_tag        = "latest"
-# backend_resources = {
-#   requests = {
-#     memory = "256Mi"
-#     cpu    = "100m"
-#   }
-#   limits = {
-#     memory = "512Mi"
-#     cpu    = "500m"
-#   }
-# }
-
-frontend_replica_count    = 2
-frontend_image_repository = "ghcr.io/your-org/orbit-frontend"
-frontend_image_tag        = "latest"
-
-ingress_enabled         = true
-ingress_host            = "orbit.yourdomain.com"
-ingress_tls_enabled     = true
-ingress_tls_secret_name = "orbit-tls"
-cert_manager_issuer     = "letsencrypt-prod"
-
-# Uncomment if using IAM Roles for Service Accounts
-# irsa_enabled  = true
-# irsa_role_arn = "arn:aws:iam::ACCOUNT_ID:role/orbit-role"
+# -----------------------------------------------------------------------------
+# GitOps Bootstrap Configuration
+# -----------------------------------------------------------------------------
+# Creates ClusterSecretStore, ExternalSecret, and application namespace
+enable_gitops_bootstrap = true
+application_namespace   = "orbit"
 
 # -----------------------------------------------------------------------------
 # Tags & Protection
