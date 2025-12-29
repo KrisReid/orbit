@@ -116,6 +116,19 @@ output "artifact_registry_frontend_image" {
 }
 
 # -----------------------------------------------------------------------------
+# GitHub Actions CI/CD Outputs
+# -----------------------------------------------------------------------------
+output "github_actions_workload_identity_provider" {
+  description = "Workload Identity Provider for GitHub Actions (use in GitHub secrets as GCP_WORKLOAD_IDENTITY_PROVIDER)"
+  value       = var.enable_github_actions_cicd ? google_iam_workload_identity_pool_provider.github[0].name : null
+}
+
+output "github_actions_service_account" {
+  description = "Service account email for GitHub Actions (use in GitHub secrets as GCP_SERVICE_ACCOUNT)"
+  value       = var.enable_github_actions_cicd ? google_service_account.github_actions[0].email : null
+}
+
+# -----------------------------------------------------------------------------
 # GitOps Outputs
 # -----------------------------------------------------------------------------
 output "gitops_secret_store_name" {

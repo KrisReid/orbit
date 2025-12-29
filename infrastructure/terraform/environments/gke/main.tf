@@ -154,6 +154,72 @@ resource "google_project_iam_member" "gke_artifact_registry_reader" {
 }
 
 # -----------------------------------------------------------------------------
+# GitHub Actions Workload Identity Federation (for CI/CD)
+# -----------------------------------------------------------------------------
+resource "google_iam_workload_identity_pool" "github_actions" {
+  count = var.enable_github_actions_cicd ? 1 : 0
+
+  workload_identity_pool_id = "github-actions"
+  display_name              = "GitHub Actions Pool"
+  description               = "Workload Identity Pool for GitHub Actions CI/CD"
+  project                   = var.project_id
+
+  depends_on = [google_project_service.main]
+}
+
+resource "google_iam_workload_identity_pool_provider" "github" {
+  count = var.enable_github_actions_cicd ? 1 : 0
+
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github_actions[0].workload_identity_pool_id
+  workload_identity_pool_provider_id = "github"
+  display_name                       = "GitHub Provider"
+  project                            = var.project_id
+
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.actor"      = "assertion.actor"
+    "attribute.repository" = "assertion.repository"
+    "attribute.ref"        = "assertion.ref"
+  }
+
+  # Restrict to specific repository
+  attribute_condition = "assertion.repository == '${var.github_repository}'"
+
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+}
+
+# Service account for GitHub Actions CI/CD
+resource "google_service_account" "github_actions" {
+  count = var.enable_github_actions_cicd ? 1 : 0
+
+  account_id   = "${var.project_name}-cicd"
+  display_name = "GitHub Actions CI/CD for ${var.project_name}"
+  project      = var.project_id
+
+  depends_on = [google_project_service.main]
+}
+
+# Grant Artifact Registry write access to GitHub Actions service account
+resource "google_project_iam_member" "github_actions_artifact_registry" {
+  count = var.enable_github_actions_cicd && var.create_artifact_registry ? 1 : 0
+
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${google_service_account.github_actions[0].email}"
+}
+
+# Allow GitHub repository to impersonate the service account
+resource "google_service_account_iam_member" "github_actions_workload_identity" {
+  count = var.enable_github_actions_cicd ? 1 : 0
+
+  service_account_id = google_service_account.github_actions[0].name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github_actions[0].name}/attribute.repository/${var.github_repository}"
+}
+
+# -----------------------------------------------------------------------------
 # GCP Service Account for External Secrets (created here to avoid cycles)
 # -----------------------------------------------------------------------------
 resource "google_service_account" "external_secrets" {

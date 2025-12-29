@@ -94,6 +94,13 @@ enable_gitops_bootstrap = true
 application_namespace   = "orbit"
 
 # -----------------------------------------------------------------------------
+# GitHub Actions CI/CD
+# -----------------------------------------------------------------------------
+# Creates Workload Identity Federation for GitHub Actions to push images
+enable_github_actions_cicd = true
+github_repository          = "KrisReid/orbit"  # Your GitHub repository (owner/repo)
+
+# -----------------------------------------------------------------------------
 # Labels & Protection
 # -----------------------------------------------------------------------------
 labels = {

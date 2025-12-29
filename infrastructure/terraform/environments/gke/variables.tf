@@ -199,6 +199,21 @@ variable "create_artifact_registry" {
 }
 
 # -----------------------------------------------------------------------------
+# GitHub Actions CI/CD
+# -----------------------------------------------------------------------------
+variable "enable_github_actions_cicd" {
+  description = "Enable Workload Identity Federation for GitHub Actions CI/CD"
+  type        = bool
+  default     = true
+}
+
+variable "github_repository" {
+  description = "GitHub repository in format 'owner/repo' (e.g., 'KrisReid/orbit')"
+  type        = string
+  default     = ""
+}
+
+# -----------------------------------------------------------------------------
 # Kubernetes Addons
 # -----------------------------------------------------------------------------
 variable "enable_nginx_ingress" {
