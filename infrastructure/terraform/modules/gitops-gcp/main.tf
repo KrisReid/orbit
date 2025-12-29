@@ -88,7 +88,7 @@ resource "kubectl_manifest" "database_external_secret" {
     }
   })
 
-  depends_on = [kubectl_manifest.secret_store, kubernetes_namespace.application]
+  depends_on = [kubectl_manifest.secret_store, kubernetes_namespace_v1.application]
 }
 
 # -----------------------------------------------------------------------------
@@ -101,8 +101,8 @@ resource "kubectl_manifest" "argocd_application" {
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
     metadata = {
-      name      = "orbit"
-      namespace = var.argocd_namespace
+      name       = "orbit"
+      namespace  = var.argocd_namespace
       finalizers = var.enable_argocd_finalizer ? ["resources-finalizer.argocd.argoproj.io"] : []
     }
     spec = {
@@ -132,34 +132,16 @@ resource "kubectl_manifest" "argocd_application" {
               }
             }
             ingress = {
-              enabled = var.enable_ingress
+              enabled   = var.enable_ingress
               className = "nginx"
               annotations = {
                 "cert-manager.io/cluster-issuer" = var.cluster_issuer
               }
-              hosts = [
-                {
-                  host = var.ingress_host
-                  paths = [
-                    {
-                      path     = "/api"
-                      pathType = "Prefix"
-                      service  = "backend"
-                    },
-                    {
-                      path     = "/"
-                      pathType = "Prefix"
-                      service  = "frontend"
-                    }
-                  ]
-                }
-              ]
-              tls = var.enable_tls ? [
-                {
-                  secretName = "orbit-tls"
-                  hosts      = [var.ingress_host]
-                }
-              ] : []
+              host = var.ingress_host
+              tls = {
+                enabled    = var.enable_tls
+                secretName = "orbit-tls"
+              }
             }
             # Disable built-in PostgreSQL since we use Cloud SQL
             postgresql = {
@@ -180,7 +162,8 @@ resource "kubectl_manifest" "argocd_application" {
         syncOptions = [
           "CreateNamespace=true"
         ]
-      } : {
+        } : {
+        automated = null
         syncOptions = [
           "CreateNamespace=true"
         ]
@@ -194,7 +177,7 @@ resource "kubectl_manifest" "argocd_application" {
 # -----------------------------------------------------------------------------
 # Create application namespace if it doesn't exist
 # -----------------------------------------------------------------------------
-resource "kubernetes_namespace" "application" {
+resource "kubernetes_namespace_v1" "application" {
   metadata {
     name = var.application_namespace
     labels = {
