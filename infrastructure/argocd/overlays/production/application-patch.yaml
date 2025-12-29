@@ -39,7 +39,7 @@ spec:
           
           image:
             repository: europe-west2-docker.pkg.dev/gen-lang-client-0354936138/orbit/backend
-            tag: latest
+            tag: "8da5148"
             pullPolicy: IfNotPresent
           
           resources:
@@ -65,7 +65,7 @@ spec:
           
           image:
             repository: europe-west2-docker.pkg.dev/gen-lang-client-0354936138/orbit/frontend
-            tag: latest
+            tag: "8da5148"
             pullPolicy: IfNotPresent
 
           resources:
