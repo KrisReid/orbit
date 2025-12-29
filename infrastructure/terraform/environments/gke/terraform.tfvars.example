@@ -1,7 +1,7 @@
 # =============================================================================
-# Orbit GKE Environment - Example Configuration
+# Orbit GKE Environment - Example Terraform Variables
 # =============================================================================
-# Copy this file to terraform.tfvars and update with your values.
+# Copy this file to terraform.tfvars and customize for your environment.
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -14,9 +14,9 @@ region       = "us-central1"
 # -----------------------------------------------------------------------------
 # VPC Configuration
 # -----------------------------------------------------------------------------
-# vpc_subnet_cidr   = "10.0.0.0/20"
-# vpc_pods_cidr     = "10.16.0.0/14"
-# vpc_services_cidr = "10.20.0.0/20"
+vpc_subnet_cidr   = "10.0.0.0/20"
+vpc_pods_cidr     = "10.16.0.0/14"
+vpc_services_cidr = "10.20.0.0/20"
 
 # -----------------------------------------------------------------------------
 # GKE Cluster Configuration
@@ -24,19 +24,15 @@ region       = "us-central1"
 regional_cluster        = true
 enable_private_nodes    = true
 enable_private_endpoint = false
-# master_ipv4_cidr_block = "172.16.0.0/28"
+master_ipv4_cidr_block  = "172.16.0.0/28"
 
-# Uncomment to restrict master access to specific networks
-# master_authorized_networks = [
-#   {
-#     cidr_block   = "10.0.0.0/8"
-#     display_name = "VPC"
-#   },
-#   {
-#     cidr_block   = "YOUR_IP/32"
-#     display_name = "Office"
-#   }
-# ]
+# Allow access from your IP (replace with your actual IP or CIDR)
+master_authorized_networks = [
+  {
+    cidr_block   = "0.0.0.0/0"
+    display_name = "All networks (restrict in production)"
+  }
+]
 
 kubernetes_version_prefix = "1.28."
 release_channel           = "REGULAR"
@@ -45,30 +41,13 @@ node_pools = {
   default = {
     initial_node_count = 1
     min_node_count     = 1
-    max_node_count     = 5
-    enable_autoscaling = true
-    machine_type       = "e2-standard-2"
+    max_node_count     = 3
+    machine_type       = "e2-medium"
     disk_size_gb       = 100
     disk_type          = "pd-standard"
     preemptible        = false
     spot               = false
   }
-  # Uncomment for a second node pool with spot instances
-  # spot = {
-  #   initial_node_count = 0
-  #   min_node_count     = 0
-  #   max_node_count     = 10
-  #   enable_autoscaling = true
-  #   machine_type       = "e2-standard-2"
-  #   spot               = true
-  #   taints = [
-  #     {
-  #       key    = "spot"
-  #       value  = "true"
-  #       effect = "NO_SCHEDULE"
-  #     }
-  #   ]
-  # }
 }
 
 enable_network_policy = true
@@ -76,14 +55,13 @@ enable_network_policy = true
 # -----------------------------------------------------------------------------
 # Database Configuration
 # -----------------------------------------------------------------------------
-database_version           = "POSTGRES_15"
-database_tier              = "db-custom-1-3840"  # 1 vCPU, 3.75 GB RAM
-database_availability_type = "REGIONAL"
-database_disk_size         = 20
-database_name              = "orbit"
-database_user              = "orbit"
-# database_password        = ""  # Leave empty for auto-generation
-
+database_version                = "POSTGRES_15"
+database_tier                   = "db-f1-micro"  # Use db-custom-2-4096 or larger for production
+database_availability_type      = "ZONAL"         # Use REGIONAL for production
+database_disk_size              = 20
+database_name                   = "orbit"
+database_user                   = "orbit"
+# database_password             = null  # Leave null to auto-generate
 database_backup_enabled         = true
 database_point_in_time_recovery = true
 
@@ -94,49 +72,72 @@ enable_nginx_ingress       = true
 nginx_replica_count        = 2
 enable_cert_manager        = true
 create_letsencrypt_issuers = true
-letsencrypt_email          = "admin@example.com"
+letsencrypt_email          = "admin@example.com"  # Required for Let's Encrypt
 
 # -----------------------------------------------------------------------------
-# Orbit Application
+# ArgoCD Configuration
 # -----------------------------------------------------------------------------
-orbit_namespace = "orbit"
-# orbit_chart_path = "../../../helm/orbit"
+enable_argocd    = true
+argocd_namespace = "argocd"
 
-backend_replica_count    = 2
-backend_image_repository = "ghcr.io/your-org/orbit-backend"
-backend_image_tag        = "latest"
-# backend_resources = {
-#   requests = {
-#     memory = "256Mi"
-#     cpu    = "100m"
-#   }
-#   limits = {
-#     memory = "512Mi"
-#     cpu    = "500m"
-#   }
-# }
+# -----------------------------------------------------------------------------
+# External Secrets Configuration
+# -----------------------------------------------------------------------------
+enable_external_secrets          = true
+external_secrets_namespace       = "external-secrets"
+external_secrets_service_account = "external-secrets"
+secret_refresh_interval          = "1h"
 
-frontend_replica_count    = 2
-frontend_image_repository = "ghcr.io/your-org/orbit-frontend"
+# -----------------------------------------------------------------------------
+# GitOps Bootstrap Configuration
+# -----------------------------------------------------------------------------
+# Set to true to automatically deploy Orbit via ArgoCD with External Secrets
+enable_gitops_bootstrap   = true
+application_namespace     = "orbit"
+deploy_argocd_application = true
+enable_argocd_finalizer   = true
+
+# -----------------------------------------------------------------------------
+# Git Repository Configuration
+# -----------------------------------------------------------------------------
+# IMPORTANT: Update this to your forked/cloned repository URL
+git_repo_url        = "https://github.com/YOUR_ORG/orbit.git"
+git_target_revision = "main"
+helm_chart_path     = "infrastructure/helm/orbit"
+helm_value_files    = ["values.yaml", "values-production.yaml"]
+
+# -----------------------------------------------------------------------------
+# Container Images
+# -----------------------------------------------------------------------------
+# IMPORTANT: Update these to your container registry
+backend_image_repository  = "ghcr.io/YOUR_ORG/orbit-backend"
+backend_image_tag         = "latest"
+frontend_image_repository = "ghcr.io/YOUR_ORG/orbit-frontend"
 frontend_image_tag        = "latest"
 
-ingress_enabled         = true
-ingress_host            = "orbit.yourdomain.com"
-ingress_tls_enabled     = true
-ingress_tls_secret_name = "orbit-tls"
-cert_manager_issuer     = "letsencrypt-prod"
+# -----------------------------------------------------------------------------
+# Application Ingress Configuration
+# -----------------------------------------------------------------------------
+enable_app_ingress = true
+ingress_host       = "orbit.example.com"  # Your domain
+enable_tls         = true
+cluster_issuer     = "letsencrypt-prod"   # Use "letsencrypt-staging" for testing
 
-# Uncomment if using Workload Identity
-# workload_identity_sa = "orbit-sa@your-project.iam.gserviceaccount.com"
+# -----------------------------------------------------------------------------
+# ArgoCD Sync Configuration
+# -----------------------------------------------------------------------------
+enable_auto_sync    = true
+auto_sync_prune     = true
+auto_sync_self_heal = true
 
 # -----------------------------------------------------------------------------
 # Labels & Protection
 # -----------------------------------------------------------------------------
 labels = {
   environment = "production"
-  application = "orbit"
+  app         = "orbit"
   managed-by  = "terraform"
 }
 
-# Set to false to allow terraform destroy
+# Set to false to allow terraform destroy (NOT recommended for production)
 deletion_protection = true

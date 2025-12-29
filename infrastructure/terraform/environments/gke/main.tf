@@ -2,7 +2,37 @@
 # Orbit GKE Environment
 # =============================================================================
 # Complete infrastructure and application deployment for Google Kubernetes Engine.
+# 
+# This Terraform configuration provisions:
+# - VPC networking
+# - GKE cluster
+# - Cloud SQL database (with password stored in Secret Manager)
+# - Kubernetes addons (ingress-nginx, cert-manager, ArgoCD, External Secrets)
+# - GitOps bootstrap (SecretStore, ExternalSecret, ArgoCD Application)
+#
+# After `terraform apply`, ArgoCD automatically deploys Orbit with database
+# credentials synced from GCP Secret Manager.
 # =============================================================================
+
+# -----------------------------------------------------------------------------
+# Project Services
+# -----------------------------------------------------------------------------
+# Enables the GCP APIs required for this infrastructure.
+resource "google_project_service" "main" {
+  for_each = toset([
+    "compute.googleapis.com",
+    "container.googleapis.com",
+    "servicenetworking.googleapis.com",
+    "sqladmin.googleapis.com",
+    "secretmanager.googleapis.com",
+    "iam.googleapis.com"
+  ])
+
+  project                    = var.project_id
+  service                    = each.key
+  disable_dependent_services = false
+  disable_on_destroy         = false
+}
 
 # -----------------------------------------------------------------------------
 # VPC Network
@@ -20,6 +50,8 @@ module "vpc" {
 
   enable_nat              = var.enable_private_nodes
   enable_private_services = true
+
+  depends_on = [google_project_service.main]
 }
 
 # -----------------------------------------------------------------------------
@@ -81,6 +113,9 @@ module "database" {
   database_user = var.database_user
   password      = var.database_password
 
+  # Store password in GCP Secret Manager for External Secrets
+  create_secret = true
+
   backup_enabled         = var.database_backup_enabled
   point_in_time_recovery = var.database_point_in_time_recovery
 
@@ -92,37 +127,117 @@ module "database" {
 }
 
 # -----------------------------------------------------------------------------
+# GCP Service Account for External Secrets (created here to avoid cycles)
+# -----------------------------------------------------------------------------
+resource "google_service_account" "external_secrets" {
+  count = var.enable_external_secrets ? 1 : 0
+
+  account_id   = "${var.project_name}-eso"
+  display_name = "External Secrets Operator for ${var.project_name}"
+  project      = var.project_id
+
+  depends_on = [google_project_service.main]
+}
+
+# Grant Secret Manager access to the service account
+resource "google_project_iam_member" "external_secrets_secretmanager" {
+  count = var.enable_external_secrets ? 1 : 0
+
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.external_secrets[0].email}"
+}
+
+# Workload Identity binding - allows K8s SA to impersonate GCP SA
+resource "google_service_account_iam_member" "external_secrets_workload_identity" {
+  count = var.enable_external_secrets ? 1 : 0
+
+  service_account_id = google_service_account.external_secrets[0].name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[${var.external_secrets_namespace}/${var.external_secrets_service_account}]"
+}
+
+# -----------------------------------------------------------------------------
 # Kubernetes Addons
 # -----------------------------------------------------------------------------
 module "kubernetes_addons" {
   source = "../../modules/kubernetes-addons"
 
+  # NGINX Ingress
   enable_nginx_ingress = var.enable_nginx_ingress
   nginx_replica_count  = var.nginx_replica_count
 
+  # cert-manager
   enable_cert_manager        = var.enable_cert_manager
   create_letsencrypt_issuers = var.create_letsencrypt_issuers
   letsencrypt_email          = var.letsencrypt_email
 
-  enable_argocd = true
+  # ArgoCD
+  enable_argocd = var.enable_argocd
 
-  depends_on = [module.gke]
+  # External Secrets Operator
+  enable_external_secrets = var.enable_external_secrets
+  external_secrets_service_account_annotations = var.enable_external_secrets ? {
+    "iam.gke.io/gcp-service-account" = google_service_account.external_secrets[0].email
+  } : {}
+
+  depends_on = [module.gke, google_service_account.external_secrets]
 }
 
 # -----------------------------------------------------------------------------
-# Note: Orbit Application Deployment
+# GitOps Bootstrap (External Secrets + ArgoCD Application)
 # -----------------------------------------------------------------------------
-# The Orbit application is deployed via ArgoCD (GitOps), not Terraform.
-# See infrastructure/argocd/ for application deployment configuration.
-#
-# This Terraform configuration provisions:
-# - VPC networking
-# - GKE cluster
-# - Cloud SQL database
-# - Kubernetes addons (ingress-nginx, cert-manager)
-#
-# ArgoCD deploys:
-# - Orbit Helm chart (backend, frontend, ingress)
-#
-# Database connection info is available via outputs for ArgoCD configuration.
-# -----------------------------------------------------------------------------
+module "gitops" {
+  source = "../../modules/gitops-gcp"
+  count  = var.enable_gitops_bootstrap ? 1 : 0
+
+  project_id = var.project_id
+
+  cluster_name     = module.gke.cluster_name
+  cluster_location = var.regional_cluster ? var.region : "${var.region}-a"
+
+  # External Secrets configuration
+  external_secrets_namespace       = var.external_secrets_namespace
+  external_secrets_service_account = var.external_secrets_service_account
+  external_secrets_ready           = module.kubernetes_addons
+  secret_refresh_interval          = var.secret_refresh_interval
+
+  # Database configuration (from Cloud SQL module)
+  database_host      = module.database.private_ip_address
+  database_name      = module.database.database_name
+  database_user      = module.database.database_user
+  database_secret_id = module.database.secret_id
+
+  # Application configuration
+  application_namespace = var.application_namespace
+
+  # ArgoCD configuration
+  argocd_namespace          = var.argocd_namespace
+  deploy_argocd_application = var.deploy_argocd_application
+  enable_argocd_finalizer   = var.enable_argocd_finalizer
+
+  # Git repository configuration
+  git_repo_url        = var.git_repo_url
+  git_target_revision = var.git_target_revision
+  helm_chart_path     = var.helm_chart_path
+  helm_value_files    = var.helm_value_files
+
+  # Container images
+  backend_image_repository  = var.backend_image_repository
+  backend_image_tag         = var.backend_image_tag
+  frontend_image_repository = var.frontend_image_repository
+  frontend_image_tag        = var.frontend_image_tag
+
+  # Ingress configuration
+  enable_ingress   = var.enable_app_ingress
+  ingress_host     = var.ingress_host
+  enable_tls       = var.enable_tls
+  cluster_issuer   = var.cluster_issuer
+
+  # Sync configuration
+  enable_auto_sync     = var.enable_auto_sync
+  auto_sync_prune      = var.auto_sync_prune
+  auto_sync_self_heal  = var.auto_sync_self_heal
+
+  depends_on = [module.kubernetes_addons, module.database]
+}

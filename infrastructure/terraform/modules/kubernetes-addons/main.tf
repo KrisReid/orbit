@@ -183,13 +183,14 @@ resource "kubectl_manifest" "letsencrypt_prod" {
 # -----------------------------------------------------------------------------
 # ArgoCD
 # -----------------------------------------------------------------------------
+# Using OCI registry (ghcr.io) instead of GitHub Pages - more reliable networking
 resource "helm_release" "argocd" {
   count = var.enable_argocd ? 1 : 0
 
   name             = "argocd"
   namespace        = var.argocd_namespace
   create_namespace = true
-  repository       = "https://argoproj.github.io/argo-helm"
+  repository       = "oci://ghcr.io/argoproj/argo-helm"
   chart            = "argo-cd"
   version          = var.argocd_chart_version
 
