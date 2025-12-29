@@ -21,7 +21,7 @@ metadata:
 spec:
   source:
     # UPDATE THIS: Your Git repository URL
-    repoURL: https://github.com/YOUR_ORG/orbit.git
+    repoURL: https://github.com/KrisReid/orbit.git
     targetRevision: main  # Production branch
 
     helm:
@@ -39,7 +39,7 @@ spec:
           
           image:
             # UPDATE THIS: Your container registry
-            repository: ghcr.io/YOUR_ORG/orbit-backend
+            repository: ghcr.io/KrisReid/orbit-backend
             tag: latest  # Consider using specific versions in production
             pullPolicy: IfNotPresent
           
@@ -66,7 +66,7 @@ spec:
           
           image:
             # UPDATE THIS: Your container registry
-            repository: ghcr.io/YOUR_ORG/orbit-frontend
+            repository: ghcr.io/KrisReid/orbit-frontend
             tag: latest
             pullPolicy: IfNotPresent
 

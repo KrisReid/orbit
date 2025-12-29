@@ -139,7 +139,13 @@ output "next_steps" {
     1. Configure kubectl:
        ${module.gke.kubeconfig_command}
     
-    2. Deploy the ArgoCD Application (GitOps):
+    2. Navigate to the project root and deploy the ArgoCD Application:
+       cd ../../../../  # Go to project root (orbit/)
+       
+       # Edit the overlay with your repository URL and domain:
+       vim infrastructure/argocd/overlays/production/application-patch.yaml
+       
+       # Apply the ArgoCD Application:
        kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
     
     3. Check ArgoCD Application status:

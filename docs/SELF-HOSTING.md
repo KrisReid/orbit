@@ -81,6 +81,7 @@ Fork or clone the Orbit repository to your own GitHub organization. You'll need 
 
 **For AWS EKS:**
 ```bash
+# From project root (orbit/)
 cd infrastructure/terraform/environments/eks
 
 # Configure variables
@@ -99,6 +100,7 @@ aws eks update-kubeconfig \
 
 **For GCP GKE:**
 ```bash
+# From project root (orbit/)
 cd infrastructure/terraform/environments/gke
 
 # Configure variables
@@ -122,7 +124,12 @@ Terraform creates:
 
 ### Step 3: Deploy Application with ArgoCD
 
+**Important:** Run these commands from the project root directory (orbit/), not from the terraform directory.
+
 ```bash
+# Return to project root
+cd ../../../..  # or: cd /path/to/orbit
+
 # Edit the overlay with your configuration
 vim infrastructure/argocd/overlays/production/application-patch.yaml
 ```
@@ -133,7 +140,7 @@ vim infrastructure/argocd/overlays/production/application-patch.yaml
 - `image repositories`: Your container registry (e.g., `ghcr.io/YOUR_ORG/orbit-backend`)
 
 ```bash
-# Apply the ArgoCD Application
+# Apply the ArgoCD Application (must be run from project root)
 kustomize build infrastructure/argocd/overlays/production | kubectl apply -f -
 
 # Check deployment status
