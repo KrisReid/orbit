@@ -64,47 +64,13 @@ Production deployment to AWS EKS or GCP GKE using Terraform and ArgoCD.
 
 - Terraform >= 1.5.0
 - kubectl
-- Helm (for local testing)
+- Docker (for building images)
 - AWS CLI or gcloud CLI (authenticated)
 - A domain name for TLS (optional but recommended)
-- Container images pushed to a registry (GCR, ECR, or Artifact Registry)
 
-### Step 1: Prepare Container Images
+### Step 1: Deploy Infrastructure
 
-Before deploying, build and push your container images:
-
-**GCP Artifact Registry:**
-```bash
-# Authenticate
-gcloud auth configure-docker ${REGION}-docker.pkg.dev
-
-# Create repository (if not exists)
-gcloud artifacts repositories create orbit --repository-format=docker --location=${REGION}
-
-# Build and push
-docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/orbit/backend:latest ./backend
-docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/orbit/frontend:latest ./frontend
-docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/orbit/backend:latest
-docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/orbit/frontend:latest
-```
-
-**AWS ECR:**
-```bash
-# Authenticate
-aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
-
-# Create repositories
-aws ecr create-repository --repository-name orbit/backend
-aws ecr create-repository --repository-name orbit/frontend
-
-# Build and push
-docker build -t ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/orbit/backend:latest ./backend
-docker build -t ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/orbit/frontend:latest ./frontend
-docker push ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/orbit/backend:latest
-docker push ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/orbit/frontend:latest
-```
-
-### Step 2: Deploy Infrastructure
+Terraform creates all required infrastructure including the container registry.
 
 ```bash
 cd infrastructure/terraform/environments/production
@@ -124,11 +90,64 @@ terraform apply
 - VPC and networking
 - Kubernetes cluster (EKS or GKE)
 - Managed PostgreSQL (RDS or Cloud SQL)
+- **Container Registry** (Artifact Registry or ECR)
 - NGINX Ingress Controller
 - cert-manager with Let's Encrypt
 - ArgoCD
 - External Secrets Operator
 - **ArgoCD Application** (automatically deploys Orbit)
+
+### Step 2: Configure CI/CD for Automatic Deployments
+
+The CI/CD pipeline automatically builds and pushes container images when you push to `main`. You need to configure GitHub secrets first.
+
+**1. Get credentials from Terraform:**
+```bash
+terraform output github_actions_workload_identity_provider
+terraform output github_actions_service_account
+terraform output container_registry
+```
+
+**2. Configure GitHub Repository:**
+
+Go to your repository: **Settings → Secrets and variables → Actions**
+
+**For GCP - Add Secrets:**
+| Secret Name | Value |
+|-------------|-------|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Output from terraform |
+| `GCP_SERVICE_ACCOUNT` | Output from terraform |
+
+**For GCP - Add Variables:**
+| Variable Name | Value |
+|---------------|-------|
+| `CLOUD_PROVIDER` | `gcp` |
+| `GCP_PROJECT_ID` | Your GCP project ID |
+| `GCP_REGION` | Your region (e.g., `europe-west2`) |
+| `GAR_REPOSITORY` | `orbit` |
+
+**For AWS - Add Secrets:**
+| Secret Name | Value |
+|-------------|-------|
+| `AWS_ROLE_ARN` | Output from terraform |
+| `AWS_ACCOUNT_ID` | Your AWS account ID |
+
+**For AWS - Add Variables:**
+| Variable Name | Value |
+|---------------|-------|
+| `CLOUD_PROVIDER` | `aws` |
+| `AWS_REGION` | Your region (e.g., `us-east-1`) |
+| `ECR_REPOSITORY` | `orbit` |
+
+**3. Trigger the pipeline:**
+```bash
+git commit --allow-empty -m "trigger: initial deployment"
+git push origin main
+```
+
+The pipeline will build both images and push them to your registry. ArgoCD will then automatically deploy them.
+
+> **Note:** For the initial deployment only, if you prefer to build manually without CI/CD, see [Manual Image Build](#manual-image-build) below.
 
 ### Step 3: Access Your Deployment
 
@@ -137,57 +156,109 @@ After `terraform apply` completes:
 ```bash
 # Configure kubectl
 $(terraform output -raw kubeconfig_command)
-
-# View next steps
-terraform output next_steps
 ```
 
 #### Access ArgoCD UI
 
-```bash
-# Port forward to ArgoCD
-kubectl port-forward svc/argocd-server -n argocd 8080:80
+ArgoCD provides a web interface to monitor your application deployments.
 
-# Get admin password
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+**1. Start port forwarding** (run this in a terminal and keep it running):
+```bash
+kubectl port-forward svc/argocd-server -n argocd 8080:80
 ```
 
-Open http://localhost:8080 and login with:
+**2. Get the admin password** (run in a separate terminal):
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d && echo
+```
+
+**3. Open ArgoCD:**
+- URL: http://localhost:8080
 - **Username:** `admin`
 - **Password:** (output from command above)
 
+> **Tip:** The port forwarding must remain active to access the ArgoCD UI. If you close the terminal, you'll need to run the port-forward command again.
+
 #### Access the Application
 
+**1. Get your load balancer IP:**
 ```bash
-# Get load balancer IP
-kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}' && echo
 ```
 
-Then either:
-1. **Configure DNS:** Point your domain to the load balancer IP
-2. **Test locally:** Add to `/etc/hosts`: `<LOAD_BALANCER_IP> orbit.yourdomain.com`
+**2. Add the IP to your hosts file:**
 
-### Step 4: Configure CI/CD (Optional)
-
-To enable GitHub Actions CI/CD with Workload Identity Federation:
-
-```hcl
-# Add to your terraform.tfvars
-enable_github_actions_cicd = true
-github_repository          = "your-org/orbit"  # Format: owner/repo
-```
-
-Then re-apply and get the outputs:
+Replace `<LOAD_BALANCER_IP>` with the IP from step 1, and use the domain you configured in `application_domain` (default: `orbit.example.com`):
 
 ```bash
-terraform apply
+# macOS/Linux
+sudo sh -c 'echo "<LOAD_BALANCER_IP> orbit.example.com" >> /etc/hosts'
 
-# Get GitHub Actions secrets
-terraform output github_actions_workload_identity_provider
-terraform output github_actions_service_account
+# Windows (run PowerShell as Administrator)
+Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "<LOAD_BALANCER_IP> orbit.example.com"
 ```
 
-Add these values to your GitHub repository: **Settings → Secrets and variables → Actions**
+**Example:** If your load balancer IP is `34.39.54.70`:
+```bash
+sudo sh -c 'echo "34.39.54.70 orbit.example.com" >> /etc/hosts'
+```
+
+**3. Access the application:**
+- URL: http://orbit.example.com (or https:// if you configured TLS)
+- **Default login:** `admin@orbit.example.com` / `admin123`
+
+> ⚠️ **Important:** Change the default password after first login!
+
+**Alternative: Configure Real DNS**
+
+For production use, instead of editing `/etc/hosts`, configure your domain's DNS:
+1. Go to your DNS provider (e.g., Cloudflare, Route53, Cloud DNS)
+2. Create an A record pointing your domain to the load balancer IP
+3. Wait for DNS propagation (usually 5-15 minutes)
+
+---
+
+## Manual Image Build
+
+If you prefer to build and push images manually instead of using CI/CD:
+
+```bash
+# Get registry URL from Terraform
+terraform output container_registry
+terraform output container_registry_auth_command
+```
+
+**GCP Artifact Registry:**
+```bash
+# Set variables
+REGION="europe-west2"
+PROJECT_ID="your-project-id"
+
+# Authenticate
+gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+# Build and push
+docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/orbit/backend:latest ./backend
+docker build -t ${REGION}-docker.pkg.dev/${PROJECT_ID}/orbit/frontend:latest ./frontend
+docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/orbit/backend:latest
+docker push ${REGION}-docker.pkg.dev/${PROJECT_ID}/orbit/frontend:latest
+```
+
+**AWS ECR:**
+```bash
+# Set variables
+REGION="us-east-1"
+ACCOUNT_ID="123456789012"
+
+# Authenticate
+aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com
+
+# Build and push
+docker build -t ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/orbit/backend:latest ./backend
+docker build -t ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/orbit/frontend:latest ./frontend
+docker push ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/orbit/backend:latest
+docker push ${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/orbit/frontend:latest
+```
 
 ---
 

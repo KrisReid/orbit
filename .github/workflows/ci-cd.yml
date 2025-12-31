@@ -2,8 +2,10 @@
 # Orbit CI/CD Pipeline
 # =============================================================================
 # CI: Runs on all pull requests and pushes to main
-# CD: Builds and pushes images to Google Artifact Registry on main branch,
-#     then updates ArgoCD overlay to trigger deployment
+# CD: Builds and pushes images to container registry on main branch,
+#     then triggers ArgoCD deployment
+#
+# Supports both GCP (Artifact Registry) and AWS (ECR)
 # =============================================================================
 
 name: CI/CD
@@ -21,10 +23,15 @@ concurrency:
 env:
   PYTHON_VERSION: "3.11"
   NODE_VERSION: "20"
-  # GCP Configuration - set these as repository variables
+  # Cloud Provider: 'gcp' or 'aws' - set as repository variable
+  CLOUD_PROVIDER: ${{ vars.CLOUD_PROVIDER || 'gcp' }}
+  # GCP Configuration
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   GCP_REGION: ${{ vars.GCP_REGION }}
   GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY || 'orbit' }}
+  # AWS Configuration
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'orbit' }}
 
 jobs:
   # ===========================================================================
@@ -119,7 +126,7 @@ jobs:
         run: npm run build
 
   # ===========================================================================
-  # Build & Push to Google Artifact Registry (main branch only)
+  # Build & Push to Container Registry (main branch only)
   # ===========================================================================
   build-and-push:
     name: Build & Push Images
@@ -128,10 +135,11 @@ jobs:
     needs: [backend, frontend]
     permissions:
       contents: read
-      id-token: write  # Required for Workload Identity Federation
+      id-token: write  # Required for Workload Identity Federation (GCP) / OIDC (AWS)
 
     outputs:
       image_tag: ${{ steps.meta.outputs.sha_short }}
+      registry: ${{ steps.meta.outputs.registry }}
 
     steps:
       - name: Checkout code
@@ -141,21 +149,50 @@ jobs:
         id: meta
         run: |
           echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
-          echo "registry=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}" >> $GITHUB_OUTPUT
+          
+          if [ "${{ env.CLOUD_PROVIDER }}" = "gcp" ]; then
+            echo "registry=${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}" >> $GITHUB_OUTPUT
+          elif [ "${{ env.CLOUD_PROVIDER }}" = "aws" ]; then
+            echo "registry=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}" >> $GITHUB_OUTPUT
+          fi
 
+      # -------------------------------------------------------------------------
+      # GCP Authentication & Docker Config
+      # -------------------------------------------------------------------------
       - name: Authenticate to Google Cloud
-        id: auth
+        if: env.CLOUD_PROVIDER == 'gcp'
+        id: auth-gcp
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
+        if: env.CLOUD_PROVIDER == 'gcp'
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Docker for Artifact Registry
+      - name: Configure Docker for GCP Artifact Registry
+        if: env.CLOUD_PROVIDER == 'gcp'
         run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
 
+      # -------------------------------------------------------------------------
+      # AWS Authentication & Docker Config
+      # -------------------------------------------------------------------------
+      - name: Configure AWS credentials
+        if: env.CLOUD_PROVIDER == 'aws'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: env.CLOUD_PROVIDER == 'aws'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # -------------------------------------------------------------------------
+      # Build & Push Images
+      # -------------------------------------------------------------------------
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 

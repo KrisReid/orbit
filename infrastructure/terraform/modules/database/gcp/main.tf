@@ -114,10 +114,13 @@ resource "google_sql_database" "main" {
 # Database User
 # -----------------------------------------------------------------------------
 resource "google_sql_user" "main" {
-  name     = var.database_user
-  project  = var.project_id
-  instance = google_sql_database_instance.main.name
-  password = local.db_password
+  name            = var.database_user
+  project         = var.project_id
+  instance        = google_sql_database_instance.main.name
+  password        = local.db_password
+  deletion_policy = "ABANDON"
+
+  depends_on = [google_sql_database.main]
 }
 
 # -----------------------------------------------------------------------------
