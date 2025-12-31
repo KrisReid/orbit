@@ -631,11 +631,13 @@ resource "kubectl_manifest" "argocd_application" {
               enabled   = var.application_domain != ""
               className = "nginx"
               host      = var.application_domain
-              annotations = var.application_domain != "" ? {
+              annotations = var.application_domain != "" && var.enable_ingress_tls ? {
                 "cert-manager.io/cluster-issuer"           = "letsencrypt-prod"
                 "nginx.ingress.kubernetes.io/ssl-redirect" = "true"
+              } : var.application_domain != "" ? {
+                "nginx.ingress.kubernetes.io/ssl-redirect" = "false"
               } : {}
-              tls = var.application_domain != "" ? {
+              tls = var.application_domain != "" && var.enable_ingress_tls ? {
                 enabled    = true
                 secretName = "${var.project_name}-tls"
               } : { enabled = false }

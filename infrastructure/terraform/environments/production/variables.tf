@@ -279,6 +279,12 @@ variable "application_domain" {
   default     = ""
 }
 
+variable "enable_ingress_tls" {
+  description = "Enable TLS for ingress (requires valid domain with DNS configured for Let's Encrypt)"
+  type        = bool
+  default     = false
+}
+
 variable "container_registry" {
   description = "Container registry URL (e.g., gcr.io/project-id or 123456789.dkr.ecr.region.amazonaws.com)"
   type        = string
