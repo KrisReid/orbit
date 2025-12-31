@@ -93,7 +93,8 @@ resource "kubectl_manifest" "database_external_secret" {
         template = {
           engineVersion = "v2"
           data = {
-            DATABASE_URL      = "{{ .connection_string }}"
+            # Use postgresql+asyncpg:// scheme for SQLAlchemy async with asyncpg driver
+            DATABASE_URL      = "postgresql+asyncpg://{{ .username }}:{{ .password }}@{{ .host }}:{{ .port }}/{{ .database }}"
             DATABASE_HOST     = "{{ .host }}"
             DATABASE_PORT     = "{{ .port }}"
             DATABASE_NAME     = "{{ .database }}"

@@ -10,7 +10,7 @@
 #   [ ] Update source.repoURL to your repository
 #   [ ] Update ingress.host to your production domain
 #   [ ] Update image repositories to your container registry
-#   [ ] Ensure ExternalSecret "orbit-db-credentials" exists (created by Terraform)
+#   [ ] Ensure ExternalSecret "orbit-database" exists (created by Terraform)
 # =============================================================================
 
 apiVersion: argoproj.io/v1alpha1
@@ -102,7 +102,8 @@ spec:
 
         externalDatabase:
           enabled: true
-          existingSecret: "orbit-db-credentials"
+          # Secret created by ExternalSecret syncing from GCP Secret Manager
+          existingSecret: "orbit-database"
           existingSecretConnectionStringKey: "DATABASE_URL"
 
         podDisruptionBudget:

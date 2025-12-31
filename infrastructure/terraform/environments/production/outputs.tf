@@ -156,7 +156,7 @@ output "github_actions_service_account" {
 # -----------------------------------------------------------------------------
 output "argocd_server_url" {
   description = "ArgoCD server URL (use port-forward to access)"
-  value       = var.enable_argocd ? "https://localhost:8080 (via: kubectl port-forward svc/argocd-server -n argocd 8080:443)" : null
+  value       = var.enable_argocd ? "http://localhost:8080 (via: kubectl port-forward svc/argocd-server -n argocd 8080:80)" : null
 }
 
 output "argocd_admin_password_command" {
@@ -192,8 +192,8 @@ output "next_steps" {
        $(terraform output -raw kubeconfig_command)
     
     2. Access ArgoCD UI:
-       kubectl port-forward svc/argocd-server -n argocd 8080:443
-       Open: https://localhost:8080
+       kubectl port-forward svc/argocd-server -n argocd 8080:80
+       Open: http://localhost:8080
        Username: admin
        Password: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
     
