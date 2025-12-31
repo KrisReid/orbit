@@ -1,40 +1,30 @@
 # Contributing to Orbit
 
-Thanks for your interest in contributing! This guide will help you get started.
+Thanks for your interest in contributing!
 
 ## Development Setup
 
-### Prerequisites
-
-- Docker and Docker Compose
-- Node.js 18+ (for frontend development outside Docker)
-- Python 3.11+ (for backend development outside Docker)
-
-### Running with Docker (Recommended)
+### With Docker (Recommended)
 
 ```bash
 docker-compose up
 ```
 
-This starts all services with hot-reload enabled. Changes to source files will automatically restart the relevant service.
+All services start with hot-reload enabled.
 
-### Running Without Docker
+### Without Docker
 
 **Backend:**
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
 
-# Set environment variables
 export DATABASE_URL="postgresql+asyncpg://orbit:orbit_secret@localhost:5432/orbit"
 export SECRET_KEY="dev-secret-key"
 
-# Run migrations and seed
 python -m app.scripts.seed
-
-# Start server
 uvicorn app.main:app --reload
 ```
 
@@ -47,173 +37,58 @@ npm run dev
 
 ## Code Style
 
-### Python (Backend)
+### Python
 
-- Follow PEP 8
-- Use type hints for all function signatures
+- PEP 8 compliant
+- Type hints on all function signatures
 - Format with `black` (line length 100)
 - Sort imports with `isort`
-- Docstrings for public functions and classes
 
-```python
-# Good
-async def create_project(
-    self,
-    title: str,
-    project_type_id: int,
-    description: str | None = None,
-) -> Project:
-    """
-    Create a new project.
-    
-    Args:
-        title: Project title
-        project_type_id: ID of the project type
-        description: Optional description
-        
-    Returns:
-        Created project with relations loaded
-    """
-    ...
-```
+### TypeScript
 
-### TypeScript (Frontend)
+- Strict mode enabled
+- Functional components with hooks
+- Named exports
 
-- Use TypeScript strict mode
-- Prefer functional components with hooks
-- Use named exports
-- Follow the existing component patterns
+### Commits
 
-```typescript
-// Good
-export function ProjectCard({ project, onEdit }: ProjectCardProps) {
-  const queryClient = useQueryClient();
-  // ...
-}
-```
-
-### Commit Messages
-
-Use conventional commits:
-
-```
-feat: add task dependency visualization
-fix: resolve duplicate task ID generation
-docs: update API reference for releases
-refactor: extract shared modal components
-chore: update dependencies
-```
-
-Format: `type: short description`
+Use conventional commits: `type: short description`
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
-## Pull Request Process
+## Pull Requests
 
-### 1. Create a Branch
+1. **Branch naming:** `feat/feature-name`, `fix/issue-description`
+2. **Test locally:** `pytest` (backend), `npm run lint` (frontend)
+3. **Keep PRs focused** — one feature or fix per PR
+4. **Update docs** if behavior changes
 
-```bash
-git checkout -b feat/your-feature-name
-# or
-git checkout -b fix/issue-description
-```
+## Architecture
 
-Branch naming:
-- `feat/` — new features
-- `fix/` — bug fixes
-- `docs/` — documentation
-- `refactor/` — code refactoring
-- `chore/` — maintenance tasks
+### Adding a Backend Entity
 
-### 2. Make Your Changes
-
-- Keep PRs focused and reasonably sized
-- Add tests for new functionality
-- Update documentation if needed
-- Ensure existing tests pass
-
-### 3. Test Locally
-
-```bash
-# Backend tests
-cd backend
-pytest
-
-# Frontend linting
-cd frontend
-npm run lint
-```
-
-### 4. Submit PR
-
-- Fill out the PR template
-- Link related issues
-- Request review from maintainers
-
-### 5. Review Process
-
-- Address reviewer feedback
-- Keep discussion focused on the code
-- Squash commits before merge if requested
-
-## Architecture Guidelines
-
-### Backend
-
-**Adding a new entity:**
-
-1. Create entity in `app/domain/entities/`
-2. Create repository in `app/domain/repositories/`
-3. Create service in `app/domain/services/`
-4. Add schemas in `app/schemas/__init__.py`
-5. Create endpoints in `app/api/v1/endpoints/`
+1. Entity in `app/domain/entities/`
+2. Repository in `app/domain/repositories/`
+3. Service in `app/domain/services/`
+4. Schemas in `app/schemas/__init__.py`
+5. Endpoints in `app/api/v1/endpoints/`
 6. Register router in `app/api/v1/router.py`
 
-**Pattern:**
-```
-Endpoint → Service → Repository → Entity
-    ↓         ↓           ↓
- Schema    Business    Database
-           Logic       Operations
-```
+### Adding a Frontend Page
 
-### Frontend
-
-**Adding a new page:**
-
-1. Create page component in `src/pages/`
-2. Add route in `src/App.tsx`
-3. Create API methods in `src/api/client.ts`
-4. Add types in `src/types/`
-
-**Shared components** go in `src/components/ui/` and should be:
-- Generic and reusable
-- Well-typed with TypeScript
-- Exported from the index file
+1. Page component in `src/pages/`
+2. Route in `src/App.tsx`
+3. API methods in `src/api/client.ts`
+4. Types in `src/types/`
 
 ## Database Migrations
 
-We use Alembic for migrations:
-
 ```bash
 cd backend
-
-# Create a new migration
-alembic revision --autogenerate -m "add_field_to_task"
-
-# Apply migrations
+alembic revision --autogenerate -m "description"
 alembic upgrade head
-
-# Rollback one migration
-alembic downgrade -1
 ```
 
 ## Questions?
 
-- Check existing issues and discussions
-- Open a new issue for bugs or feature requests
-- Start a discussion for questions
-
-## Code of Conduct
-
-Be respectful and constructive. We're all here to build something useful together.
+Open an issue or start a discussion.

@@ -1,76 +1,48 @@
 # Infrastructure
 
-Infrastructure-as-code for deploying Orbit to Kubernetes.
+Cloud-agnostic Infrastructure-as-Code for deploying Orbit to AWS or GCP.
 
-> **📖 For deployment instructions, see [Self-Hosting Guide](../docs/SELF-HOSTING.md)**
-
-## Directory Structure
+## What's Here
 
 ```
 infrastructure/
-├── argocd/                    # ArgoCD Application definitions
-│   ├── base/                  # Base manifest
-│   └── overlays/              # Environment patches (production, staging)
-├── helm/orbit/                # Helm chart
-│   ├── values.yaml            # Default values
-│   └── values-local.yaml      # Local development values
-└── terraform/
-    ├── environments/          # Root modules
-    │   ├── eks/               # AWS EKS
-    │   └── gke/               # GCP GKE
-    └── modules/               # Reusable modules
-        ├── database-aws/      # RDS PostgreSQL
-        ├── database-gcp/      # Cloud SQL
-        ├── eks/               # EKS cluster
-        ├── gke/               # GKE cluster
-        ├── gitops-aws/        # SecretStore + ExternalSecret (AWS)
-        ├── gitops-gcp/        # SecretStore + ExternalSecret (GCP)
-        ├── kubernetes-addons/ # nginx, cert-manager, ArgoCD, ESO
-        ├── vpc-aws/           # AWS VPC
-        └── vpc-gcp/           # GCP VPC
+├── terraform/     # Terraform modules and environments
+├── crossplane/    # CrossPlane XRDs for K8s-native IaC
+├── helm/          # Helm chart for application deployment
+└── argocd/        # ArgoCD application manifests
 ```
 
-## Architecture
+## Getting Started
 
+**Choose your approach:**
+
+| Approach | Best For | Documentation |
+|----------|----------|---------------|
+| Terraform | Traditional IaC, most teams | [terraform/README.md](terraform/README.md) |
+| CrossPlane | K8s-native, GitOps-first teams | [crossplane/README.md](crossplane/README.md) |
+
+Both approaches deploy identical infrastructure:
+- VPC with private subnets and NAT
+- Kubernetes cluster (EKS or GKE)
+- Managed PostgreSQL (RDS or Cloud SQL)
+- GitOps tooling (ArgoCD, External Secrets Operator)
+
+## Quick Start (Terraform)
+
+```bash
+cd terraform/environments/production
+cp terraform.tfvars.gcp.example terraform.tfvars  # or .aws.example
+# Edit terraform.tfvars with your settings
+
+terraform init
+terraform apply
 ```
-Terraform                          ArgoCD
-┌──────────────────────────┐      ┌──────────────────────────┐
-│ • VPC / Networking       │      │ • Watches Git repo       │
-│ • Kubernetes Cluster     │      │ • Deploys Helm chart     │
-│ • Managed Database       │  ──▶ │ • Auto-syncs changes     │
-│ • ArgoCD + ESO           │      │                          │
-│ • ClusterSecretStore     │      │                          │
-│ • ExternalSecret         │      │                          │
-└──────────────────────────┘      └──────────────────────────┘
-     Infrastructure                    Application
-```
 
-## Quick Reference
+## Cloud Provider Selection
 
-### Helm Values
+Set `cloud_provider = "gcp"` or `cloud_provider = "aws"` in your configuration. All modules automatically use the correct provider-specific implementation.
 
-| Value | Description | Default |
-|-------|-------------|---------|
-| `postgresql.enabled` | Use built-in PostgreSQL | `true` |
-| `externalDatabase.enabled` | Use external database | `false` |
-| `externalDatabase.existingSecret` | Secret with DATABASE_URL | `""` |
-| `ingress.host` | Application hostname | `orbit.example.com` |
-| `backend.autoscaling.enabled` | Enable HPA | `false` |
+## Related Documentation
 
-### Terraform Variables
-
-See `terraform.tfvars.example` in each environment. Key variables:
-
-| Variable | Description |
-|----------|-------------|
-| `project_name` | Resource name prefix |
-| `region` | Cloud region |
-| `enable_gitops_bootstrap` | Create SecretStore + ExternalSecret |
-| `letsencrypt_email` | Email for Let's Encrypt |
-
-### ArgoCD Overlays
-
-| Overlay | Branch | Namespace | Use |
-|---------|--------|-----------|-----|
-| `production` | main | orbit | Production deployment |
-| `staging` | develop | orbit-staging | Staging/testing |
+- [Self-Hosting Guide](../docs/SELF-HOSTING.md) — End-to-end deployment walkthrough
+- [Interface Contracts](terraform/modules/_interfaces/) — Module interface specifications

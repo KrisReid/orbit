@@ -1,9 +1,14 @@
 # =============================================================================
 # Kubernetes Addons Module - Variables
 # =============================================================================
+# Cloud-agnostic Kubernetes addons: NGINX, cert-manager, ArgoCD, ESO
+# =============================================================================
 
+# -----------------------------------------------------------------------------
+# Helm Configuration
+# -----------------------------------------------------------------------------
 variable "helm_timeout" {
-  description = "Timeout for Helm releases in seconds"
+  description = "Helm release timeout in seconds"
   type        = number
   default     = 600
 }
@@ -26,13 +31,31 @@ variable "nginx_namespace" {
 variable "nginx_chart_version" {
   description = "NGINX Ingress Controller Helm chart version"
   type        = string
-  default     = "4.9.0"
+  default     = "4.8.3"
 }
 
 variable "nginx_replica_count" {
   description = "Number of NGINX Ingress Controller replicas"
   type        = number
   default     = 2
+}
+
+variable "nginx_service_type" {
+  description = "Service type for NGINX Ingress Controller"
+  type        = string
+  default     = "LoadBalancer"
+}
+
+variable "nginx_service_annotations" {
+  description = "Annotations for NGINX service (cloud-specific load balancer config)"
+  type        = map(string)
+  default     = {}
+}
+
+variable "nginx_config" {
+  description = "NGINX ConfigMap settings"
+  type        = map(string)
+  default     = {}
 }
 
 variable "nginx_resources" {
@@ -48,29 +71,6 @@ variable "nginx_resources" {
     }), {})
   })
   default = {}
-}
-
-variable "nginx_service_type" {
-  description = "Service type for NGINX Ingress Controller"
-  type        = string
-  default     = "LoadBalancer"
-}
-
-variable "nginx_service_annotations" {
-  description = "Annotations for NGINX Ingress Controller service"
-  type        = map(string)
-  default     = {}
-}
-
-variable "nginx_config" {
-  description = "NGINX configuration map"
-  type        = map(string)
-  default = {
-    "proxy-body-size"      = "50m"
-    "proxy-read-timeout"   = "60"
-    "proxy-send-timeout"   = "60"
-    "use-forwarded-headers" = "true"
-  }
 }
 
 variable "enable_nginx_metrics" {
@@ -98,13 +98,13 @@ variable "enable_nginx_autoscaling" {
 }
 
 variable "nginx_min_replicas" {
-  description = "Minimum number of replicas for NGINX autoscaling"
+  description = "Minimum number of NGINX replicas for autoscaling"
   type        = number
   default     = 2
 }
 
 variable "nginx_max_replicas" {
-  description = "Maximum number of replicas for NGINX autoscaling"
+  description = "Maximum number of NGINX replicas for autoscaling"
   type        = number
   default     = 10
 }
@@ -116,8 +116,8 @@ variable "nginx_target_cpu_utilization" {
 }
 
 variable "nginx_extra_values" {
-  description = "Extra Helm values for NGINX Ingress Controller"
-  type        = map(string)
+  description = "Extra Helm values for NGINX Ingress Controller (merged with base values)"
+  type        = any
   default     = {}
 }
 
@@ -175,21 +175,9 @@ variable "enable_cert_manager_service_monitor" {
   default     = false
 }
 
-variable "cert_manager_webhook_replica_count" {
-  description = "Number of cert-manager webhook replicas"
-  type        = number
-  default     = 1
-}
-
-variable "cert_manager_cainjector_replica_count" {
-  description = "Number of cert-manager cainjector replicas"
-  type        = number
-  default     = 1
-}
-
 variable "cert_manager_extra_values" {
-  description = "Extra Helm values for cert-manager"
-  type        = map(string)
+  description = "Extra Helm values for cert-manager (merged with base values)"
+  type        = any
   default     = {}
 }
 
@@ -227,4 +215,49 @@ variable "argocd_chart_version" {
   description = "ArgoCD Helm chart version"
   type        = string
   default     = "5.51.1"
+}
+
+variable "argocd_server_replicas" {
+  description = "Number of ArgoCD server replicas"
+  type        = number
+  default     = 1
+}
+
+variable "argocd_extra_values" {
+  description = "Extra Helm values for ArgoCD (merged with base values)"
+  type        = any
+  default     = {}
+}
+
+# -----------------------------------------------------------------------------
+# External Secrets Operator
+# -----------------------------------------------------------------------------
+variable "enable_external_secrets" {
+  description = "Enable External Secrets Operator"
+  type        = bool
+  default     = false
+}
+
+variable "external_secrets_namespace" {
+  description = "Namespace for External Secrets Operator"
+  type        = string
+  default     = "external-secrets"
+}
+
+variable "external_secrets_chart_version" {
+  description = "External Secrets Operator Helm chart version"
+  type        = string
+  default     = "0.9.9"
+}
+
+variable "external_secrets_service_account_annotations" {
+  description = "Annotations for ESO service account (for IRSA/Workload Identity)"
+  type        = map(string)
+  default     = {}
+}
+
+variable "external_secrets_extra_values" {
+  description = "Extra Helm values for External Secrets Operator (merged with base values)"
+  type        = any
+  default     = {}
 }

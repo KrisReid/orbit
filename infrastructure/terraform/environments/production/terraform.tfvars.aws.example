@@ -1,0 +1,109 @@
+# =============================================================================
+# Orbit Production Environment - AWS Configuration
+# =============================================================================
+# AWS-specific deployment configuration.
+#
+# Usage:
+#   cp terraform.tfvars.aws.example terraform.tfvars
+#   # Edit terraform.tfvars with your values
+#   terraform init
+#   terraform plan
+#   terraform apply
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Cloud Provider Selection
+# -----------------------------------------------------------------------------
+cloud_provider = "aws"
+
+# -----------------------------------------------------------------------------
+# Common Configuration
+# -----------------------------------------------------------------------------
+project_name                = "orbit"
+region                      = "us-east-1"  # AWS region (e.g., us-east-1, eu-west-1)
+environment                 = "production"
+cluster_deletion_protection = true  # Set to false to allow cluster deletion
+
+# -----------------------------------------------------------------------------
+# AWS-Specific Configuration
+# -----------------------------------------------------------------------------
+aws_config = {
+  # Network Configuration
+  vpc_cidr                = "10.0.0.0/16"
+  availability_zone_count = 3
+  enable_vpc_endpoints    = true
+  enable_nat_gateway      = true
+  single_nat_gateway      = false  # Set to true to save costs (single NAT)
+
+  # EKS Configuration
+  kubernetes_version      = "1.28"
+  endpoint_private_access = true
+  endpoint_public_access  = true
+  public_access_cidrs     = ["0.0.0.0/0"]  # Restrict in production!
+
+  # Node Groups
+  node_groups = {
+    default = {
+      instance_types = ["t3.medium"]
+      capacity_type  = "ON_DEMAND"  # ON_DEMAND or SPOT
+      disk_size      = 50
+      desired_size   = 2
+      min_size       = 1
+      max_size       = 4
+      labels         = {}
+    }
+    # Uncomment for a spot instance node group (cost savings)
+    # spot = {
+    #   instance_types = ["t3.medium", "t3.large"]
+    #   capacity_type  = "SPOT"
+    #   disk_size      = 50
+    #   desired_size   = 2
+    #   min_size       = 1
+    #   max_size       = 10
+    #   labels = {
+    #     "node-type" = "spot"
+    #   }
+    # }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Database Configuration (Cloud-Agnostic)
+# -----------------------------------------------------------------------------
+database_instance_size         = "small"     # small, medium, large, xlarge
+database_storage_gb            = 20
+database_high_availability     = false       # Set to true for production HA
+database_name                  = "orbit"
+database_user                  = "orbit"
+# database_password            = null        # Leave null to auto-generate
+database_backup_retention_days = 7
+database_deletion_protection   = true        # Prevent accidental deletion
+database_skip_final_snapshot   = false       # Keep final snapshot on destroy
+
+# -----------------------------------------------------------------------------
+# Kubernetes Addons
+# -----------------------------------------------------------------------------
+enable_nginx_ingress       = true
+nginx_replica_count        = 2
+enable_cert_manager        = true
+create_letsencrypt_issuers = true
+letsencrypt_email          = "admin@example.com"  # REQUIRED for cert-manager
+enable_argocd              = true
+enable_external_secrets    = true
+
+# -----------------------------------------------------------------------------
+# GitOps Configuration
+# -----------------------------------------------------------------------------
+enable_gitops_bootstrap          = true
+application_namespace            = "orbit"
+external_secrets_namespace       = "external-secrets"
+external_secrets_service_account = "external-secrets"
+secret_refresh_interval          = "1h"
+
+# -----------------------------------------------------------------------------
+# Tags/Labels (lowercase for cross-cloud compatibility)
+# -----------------------------------------------------------------------------
+tags = {
+  team       = "platform"
+  costcenter = "engineering"
+}

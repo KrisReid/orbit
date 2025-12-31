@@ -1,0 +1,97 @@
+# =============================================================================
+# Orbit Production Environment - Azure Configuration
+# =============================================================================
+# Azure-specific deployment configuration.
+#
+# NOTE: Azure support is planned but not yet implemented.
+# This file serves as a template for future Azure deployments.
+#
+# Usage (once implemented):
+#   cp terraform.tfvars.azure.example terraform.tfvars
+#   # Edit terraform.tfvars with your values
+#   terraform init
+#   terraform plan
+#   terraform apply
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Cloud Provider Selection
+# -----------------------------------------------------------------------------
+cloud_provider = "azure"  # Not yet supported - coming soon
+
+# -----------------------------------------------------------------------------
+# Common Configuration
+# -----------------------------------------------------------------------------
+project_name                = "orbit"
+region                      = "westeurope"  # Azure region (e.g., eastus, westeurope)
+environment                 = "production"
+cluster_deletion_protection = true  # Set to false to allow cluster deletion
+
+# -----------------------------------------------------------------------------
+# Azure-Specific Configuration (Template for future implementation)
+# -----------------------------------------------------------------------------
+# azure_config = {
+#   subscription_id     = "your-subscription-id"
+#   resource_group_name = "orbit-rg"
+#   
+#   # Network Configuration
+#   vnet_cidr = "10.0.0.0/16"
+#   
+#   # AKS Configuration
+#   kubernetes_version = "1.28"
+#   sku_tier           = "Standard"  # Free or Standard
+#   
+#   # Node Pools
+#   node_pools = {
+#     default = {
+#       vm_size            = "Standard_D2_v2"
+#       node_count         = 2
+#       min_count          = 1
+#       max_count          = 4
+#       enable_auto_scaling = true
+#       os_disk_size_gb    = 50
+#       labels             = {}
+#     }
+#   }
+# }
+
+# -----------------------------------------------------------------------------
+# Database Configuration (Cloud-Agnostic)
+# -----------------------------------------------------------------------------
+database_instance_size         = "small"     # small, medium, large, xlarge
+database_storage_gb            = 20
+database_high_availability     = false       # Set to true for production HA
+database_name                  = "orbit"
+database_user                  = "orbit"
+# database_password            = null        # Leave null to auto-generate
+database_backup_retention_days = 7
+database_deletion_protection   = true        # Prevent accidental deletion
+database_skip_final_snapshot   = false       # Keep final snapshot on destroy
+
+# -----------------------------------------------------------------------------
+# Kubernetes Addons
+# -----------------------------------------------------------------------------
+enable_nginx_ingress       = true
+nginx_replica_count        = 2
+enable_cert_manager        = true
+create_letsencrypt_issuers = true
+letsencrypt_email          = "admin@example.com"  # REQUIRED for cert-manager
+enable_argocd              = true
+enable_external_secrets    = true
+
+# -----------------------------------------------------------------------------
+# GitOps Configuration
+# -----------------------------------------------------------------------------
+enable_gitops_bootstrap          = true
+application_namespace            = "orbit"
+external_secrets_namespace       = "external-secrets"
+external_secrets_service_account = "external-secrets"
+secret_refresh_interval          = "1h"
+
+# -----------------------------------------------------------------------------
+# Tags/Labels (lowercase for cross-cloud compatibility)
+# -----------------------------------------------------------------------------
+tags = {
+  team       = "platform"
+  costcenter = "engineering"
+}

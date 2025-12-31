@@ -1,0 +1,124 @@
+# =============================================================================
+# Orbit Production Environment - GCP Configuration
+# =============================================================================
+# GCP-specific deployment configuration.
+#
+# Usage:
+#   cp terraform.tfvars.gcp.example terraform.tfvars
+#   # Edit terraform.tfvars with your values
+#   terraform init
+#   terraform plan
+#   terraform apply
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Cloud Provider Selection
+# -----------------------------------------------------------------------------
+cloud_provider = "gcp"
+
+# -----------------------------------------------------------------------------
+# Common Configuration
+# -----------------------------------------------------------------------------
+project_name                = "orbit"
+region                      = "europe-west2"  # GCP region (e.g., us-central1, europe-west2)
+environment                 = "production"
+cluster_deletion_protection = true  # Set to false to allow cluster deletion
+
+# -----------------------------------------------------------------------------
+# GCP-Specific Configuration
+# -----------------------------------------------------------------------------
+gcp_config = {
+  project_id = "your-gcp-project-id"  # REQUIRED: Your GCP project ID
+
+  # Network Configuration
+  vpc_subnet_cidr = "10.0.0.0/20"
+  pods_cidr       = "10.16.0.0/14"
+  services_cidr   = "10.20.0.0/20"
+
+  # GKE Configuration
+  regional_cluster          = true         # true = regional, false = zonal
+  kubernetes_version_prefix = "1.28."
+  release_channel           = "REGULAR"    # RAPID, REGULAR, STABLE
+  enable_private_nodes      = true
+  enable_private_endpoint   = false        # true = fully private cluster
+  master_ipv4_cidr_block    = "172.16.0.0/28"
+  
+  # Master Authorized Networks (restrict kubectl access)
+  master_authorized_networks = []
+  # master_authorized_networks = [
+  #   {
+  #     cidr_block   = "10.0.0.0/8"
+  #     display_name = "Internal Network"
+  #   },
+  #   {
+  #     cidr_block   = "YOUR_IP/32"
+  #     display_name = "Your Office"
+  #   }
+  # ]
+
+  # Node Pools
+  node_pools = {
+    default = {
+      machine_type       = "e2-medium"
+      initial_node_count = 1
+      min_node_count     = 1
+      max_node_count     = 3
+      preemptible        = false
+      spot               = false
+      labels             = {}
+    }
+    # Uncomment for a preemptible node pool (cost savings)
+    # preemptible = {
+    #   machine_type       = "e2-medium"
+    #   initial_node_count = 1
+    #   min_node_count     = 0
+    #   max_node_count     = 5
+    #   preemptible        = true
+    #   spot               = false
+    #   labels = {
+    #     "node-type" = "preemptible"
+    #   }
+    # }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# Database Configuration (Cloud-Agnostic)
+# -----------------------------------------------------------------------------
+database_instance_size         = "small"     # small, medium, large, xlarge
+database_storage_gb            = 20
+database_high_availability     = false       # Set to true for production HA
+database_name                  = "orbit"
+database_user                  = "orbit"
+# database_password            = null        # Leave null to auto-generate
+database_backup_retention_days = 7
+database_deletion_protection   = true        # Prevent accidental deletion
+database_skip_final_snapshot   = false       # Keep final snapshot on destroy
+
+# -----------------------------------------------------------------------------
+# Kubernetes Addons
+# -----------------------------------------------------------------------------
+enable_nginx_ingress       = true
+nginx_replica_count        = 2
+enable_cert_manager        = true
+create_letsencrypt_issuers = true
+letsencrypt_email          = "admin@example.com"  # REQUIRED for cert-manager
+enable_argocd              = true
+enable_external_secrets    = true
+
+# -----------------------------------------------------------------------------
+# GitOps Configuration
+# -----------------------------------------------------------------------------
+enable_gitops_bootstrap          = true
+application_namespace            = "orbit"
+external_secrets_namespace       = "external-secrets"
+external_secrets_service_account = "external-secrets"
+secret_refresh_interval          = "1h"
+
+# -----------------------------------------------------------------------------
+# Tags/Labels (lowercase for cross-cloud compatibility)
+# -----------------------------------------------------------------------------
+tags = {
+  team       = "platform"
+  costcenter = "engineering"
+}
