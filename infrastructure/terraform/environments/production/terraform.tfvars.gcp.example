@@ -116,6 +116,17 @@ external_secrets_service_account = "external-secrets"
 secret_refresh_interval          = "1h"
 
 # -----------------------------------------------------------------------------
+# ArgoCD Application Deployment
+# -----------------------------------------------------------------------------
+# These settings auto-deploy the application via ArgoCD (no manual kustomize needed)
+deploy_argocd_application = true
+git_repository_url        = "https://github.com/YOUR_ORG/orbit.git"  # Your forked repo
+git_target_revision       = "main"
+application_domain        = "orbit.example.com"  # Your domain (or "" to skip ingress)
+# container_registry      = ""  # Auto-detected: {region}-docker.pkg.dev/{project}/{name}
+image_tag                 = "latest"  # Or specific commit SHA
+
+# -----------------------------------------------------------------------------
 # GitHub Actions CI/CD (Optional)
 # -----------------------------------------------------------------------------
 # Enable Workload Identity Federation for GitHub Actions deployments

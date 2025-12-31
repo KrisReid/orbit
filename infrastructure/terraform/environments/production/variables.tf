@@ -253,6 +253,45 @@ variable "secret_refresh_interval" {
 }
 
 # -----------------------------------------------------------------------------
+# ArgoCD Application Configuration
+# -----------------------------------------------------------------------------
+variable "deploy_argocd_application" {
+  description = "Deploy the Orbit application via ArgoCD automatically"
+  type        = bool
+  default     = true
+}
+
+variable "git_repository_url" {
+  description = "Git repository URL for ArgoCD to sync from"
+  type        = string
+  default     = ""
+}
+
+variable "git_target_revision" {
+  description = "Git branch/tag/commit to deploy"
+  type        = string
+  default     = "main"
+}
+
+variable "application_domain" {
+  description = "Domain name for the application (e.g., orbit.example.com)"
+  type        = string
+  default     = ""
+}
+
+variable "container_registry" {
+  description = "Container registry URL (e.g., gcr.io/project-id or 123456789.dkr.ecr.region.amazonaws.com)"
+  type        = string
+  default     = ""
+}
+
+variable "image_tag" {
+  description = "Container image tag to deploy"
+  type        = string
+  default     = "latest"
+}
+
+# -----------------------------------------------------------------------------
 # Cluster Configuration
 # -----------------------------------------------------------------------------
 variable "cluster_deletion_protection" {

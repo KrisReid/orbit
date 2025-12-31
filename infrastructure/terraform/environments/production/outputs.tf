@@ -152,13 +152,60 @@ output "github_actions_service_account" {
 }
 
 # -----------------------------------------------------------------------------
+# ArgoCD Access
+# -----------------------------------------------------------------------------
+output "argocd_server_url" {
+  description = "ArgoCD server URL (use port-forward to access)"
+  value       = var.enable_argocd ? "https://localhost:8080 (via: kubectl port-forward svc/argocd-server -n argocd 8080:443)" : null
+}
+
+output "argocd_admin_password_command" {
+  description = "Command to retrieve ArgoCD admin password"
+  value       = var.enable_argocd ? "kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\"{.data.password}\" | base64 -d" : null
+}
+
+# -----------------------------------------------------------------------------
+# Application Access
+# -----------------------------------------------------------------------------
+output "ingress_load_balancer_command" {
+  description = "Command to get the ingress load balancer IP/hostname"
+  value       = var.enable_nginx_ingress ? "kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'" : null
+}
+
+output "application_url" {
+  description = "Application URL (after DNS configuration)"
+  value       = var.application_domain != "" ? "https://${var.application_domain}" : null
+}
+
+# -----------------------------------------------------------------------------
 # Next Steps
 # -----------------------------------------------------------------------------
 output "next_steps" {
-  description = "Instructions for deploying the application"
+  description = "Instructions for accessing the deployment"
   value       = <<-EOT
     
     ✅ Infrastructure deployed successfully!
+    
+    📋 NEXT STEPS:
+    
+    1. Configure kubectl:
+       $(terraform output -raw kubeconfig_command)
+    
+    2. Access ArgoCD UI:
+       kubectl port-forward svc/argocd-server -n argocd 8080:443
+       Open: https://localhost:8080
+       Username: admin
+       Password: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+    
+    3. Get Load Balancer IP:
+       kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+    
+    4. Configure DNS:
+       Point ${var.application_domain != "" ? var.application_domain : "your-domain.com"} to the load balancer IP
+    
+    5. Check application status:
+       kubectl get pods -n ${var.application_namespace}
+       kubectl get applications -n argocd
     
   EOT
 }

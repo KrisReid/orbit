@@ -488,3 +488,155 @@ module "gitops" {
 
   depends_on = [module.kubernetes_addons, module.database]
 }
+
+# =============================================================================
+# ArgoCD Application Deployment
+# =============================================================================
+# Automatically deploys the Orbit application via ArgoCD, eliminating manual steps.
+# -----------------------------------------------------------------------------
+
+locals {
+  # Derive container registry from cloud provider if not explicitly set
+  default_container_registry = (
+    var.cloud_provider == "gcp" ? "${var.region}-docker.pkg.dev/${var.gcp_config.project_id}/${var.project_name}" :
+    var.cloud_provider == "aws" ? "${data.aws_caller_identity.current[0].account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.project_name}" :
+    ""
+  )
+  
+  container_registry = var.container_registry != "" ? var.container_registry : local.default_container_registry
+  
+  # Derive git repo URL if not set
+  git_repo_url = var.git_repository_url != "" ? var.git_repository_url : (
+    var.github_repository != "" ? "https://github.com/${var.github_repository}.git" : ""
+  )
+}
+
+resource "kubectl_manifest" "argocd_application" {
+  count = var.enable_argocd && var.deploy_argocd_application && local.git_repo_url != "" ? 1 : 0
+
+  yaml_body = yamlencode({
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+    metadata = {
+      name      = var.project_name
+      namespace = "argocd"
+      finalizers = ["resources-finalizer.argocd.argoproj.io"]
+    }
+    spec = {
+      project = "default"
+      source = {
+        repoURL        = local.git_repo_url
+        targetRevision = var.git_target_revision
+        path           = "infrastructure/helm/orbit"
+        helm = {
+          releaseName = var.project_name
+          valueFiles  = ["values.yaml"]
+          values = yamlencode({
+            backend = {
+              replicaCount = 2
+              image = {
+                repository = "${local.container_registry}/backend"
+                tag        = var.image_tag
+                pullPolicy = "IfNotPresent"
+              }
+              resources = {
+                requests = {
+                  memory = "256Mi"
+                  cpu    = "100m"
+                }
+                limits = {
+                  memory = "512Mi"
+                  cpu    = "500m"
+                }
+              }
+              autoscaling = {
+                enabled                        = true
+                minReplicas                    = 2
+                maxReplicas                    = 10
+                targetCPUUtilizationPercentage = 70
+              }
+              env = {
+                DEBUG = "false"
+              }
+            }
+            frontend = {
+              replicaCount = 2
+              image = {
+                repository = "${local.container_registry}/frontend"
+                tag        = var.image_tag
+                pullPolicy = "IfNotPresent"
+              }
+              resources = {
+                requests = {
+                  memory = "64Mi"
+                  cpu    = "50m"
+                }
+                limits = {
+                  memory = "128Mi"
+                  cpu    = "200m"
+                }
+              }
+              autoscaling = {
+                enabled                        = true
+                minReplicas                    = 2
+                maxReplicas                    = 5
+                targetCPUUtilizationPercentage = 70
+              }
+            }
+            ingress = {
+              enabled   = var.application_domain != ""
+              className = "nginx"
+              host      = var.application_domain
+              annotations = var.application_domain != "" ? {
+                "cert-manager.io/cluster-issuer"           = "letsencrypt-prod"
+                "nginx.ingress.kubernetes.io/ssl-redirect" = "true"
+              } : {}
+              tls = var.application_domain != "" ? {
+                enabled    = true
+                secretName = "${var.project_name}-tls"
+              } : { enabled = false }
+            }
+            postgresql = {
+              enabled = false
+            }
+            externalDatabase = {
+              enabled                          = true
+              existingSecret                   = "orbit-database"
+              existingSecretConnectionStringKey = "DATABASE_URL"
+            }
+            podDisruptionBudget = {
+              enabled      = true
+              minAvailable = 1
+            }
+          })
+        }
+      }
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = var.application_namespace
+      }
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+        syncOptions = [
+          "CreateNamespace=true",
+          "PruneLast=true",
+          "ApplyOutOfSyncOnly=true"
+        ]
+        retry = {
+          limit = 5
+          backoff = {
+            duration    = "5s"
+            factor      = 2
+            maxDuration = "3m"
+          }
+        }
+      }
+      revisionHistoryLimit = 10
+    }
+  })
+
+  depends_on = [module.kubernetes_addons, module.gitops]
+}
