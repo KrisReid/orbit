@@ -23,10 +23,16 @@ cp .env.example .env
 docker compose up -d
 ```
 
-**Access:** http://localhost  
-**Login:** `admin@orbit.example.com` / `admin123`
+**Access:** http://localhost
+**Default Login:** `admin@orbit.example.com` / `admin123`
 
-> ⚠️ Change the default password after first login.
+> ⚠️ **Security:** Change the default password after first login!
+>
+> The default admin account is created automatically on first startup. You can customize these credentials using environment variables:
+> ```bash
+> DEFAULT_ADMIN_EMAIL=admin@yourcompany.com
+> DEFAULT_ADMIN_PASSWORD=your-secure-password
+> ```
 
 ---
 
@@ -53,6 +59,7 @@ echo "127.0.0.1 orbit.local" | sudo tee -a /etc/hosts
 ```
 
 **Access:** http://orbit.local
+**Default Login:** `admin@orbit.example.com` / `admin123`
 
 ---
 

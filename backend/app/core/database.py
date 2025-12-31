@@ -72,10 +72,11 @@ async def get_db_context() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize database tables."""
+    """Initialize database tables and create default admin user if none exists."""
     # Import all models to register them with Base.metadata
     from app.domain.entities import (  # noqa: F401
         User,
+        UserRole,
         Team,
         TeamMember,
         Theme,
@@ -88,6 +89,42 @@ async def init_db() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Create default admin user if no users exist
+    await _create_default_admin()
+
+
+async def _create_default_admin() -> None:
+    """Create a default admin user if the database is empty."""
+    from sqlalchemy import select
+    from app.domain.entities import User, UserRole
+    from app.core.security import get_password_hash
+    from app.core.config import settings
+    
+    async with AsyncSessionLocal() as session:
+        # Check if any users exist
+        result = await session.execute(select(User).limit(1))
+        if result.scalar_one_or_none() is not None:
+            return  # Users already exist, skip
+        
+        # Get admin credentials from environment or use defaults
+        admin_email = settings.DEFAULT_ADMIN_EMAIL
+        admin_password = settings.DEFAULT_ADMIN_PASSWORD
+        
+        if not admin_email or not admin_password:
+            return  # No default credentials configured
+        
+        # Create admin user
+        admin = User(
+            email=admin_email,
+            hashed_password=get_password_hash(admin_password),
+            full_name="Admin User",
+            role=UserRole.ADMIN,
+            is_active=True,
+        )
+        session.add(admin)
+        await session.commit()
+        print(f"✅ Created default admin user: {admin_email}")
 
 
 async def close_db() -> None:

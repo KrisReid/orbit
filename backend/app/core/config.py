@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/orbit"
     DATABASE_ECHO: bool = False
 
+    # Default Admin User (created on first startup if no users exist)
+    DEFAULT_ADMIN_EMAIL: str = "admin@orbit.example.com"
+    DEFAULT_ADMIN_PASSWORD: str = "admin123"
+
     # CORS - stored as comma-separated string, parsed in property
     CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
 
