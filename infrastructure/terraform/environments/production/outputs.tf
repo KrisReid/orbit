@@ -131,6 +131,27 @@ output "gcp_outputs" {
 }
 
 # -----------------------------------------------------------------------------
+# GitHub Actions CI/CD Outputs
+# -----------------------------------------------------------------------------
+output "github_actions_workload_identity_provider" {
+  description = "Workload Identity Provider for GitHub Actions (use in GitHub Actions workflow)"
+  value = var.enable_github_actions_cicd ? (
+    var.cloud_provider == "gcp" ? try(google_iam_workload_identity_pool_provider.github[0].name, null) :
+    var.cloud_provider == "aws" ? try(aws_iam_openid_connect_provider.github_actions[0].arn, null) :
+    null
+  ) : null
+}
+
+output "github_actions_service_account" {
+  description = "Service Account/Role for GitHub Actions (use in GitHub Actions workflow)"
+  value = var.enable_github_actions_cicd ? (
+    var.cloud_provider == "gcp" ? try(google_service_account.github_actions[0].email, null) :
+    var.cloud_provider == "aws" ? try(aws_iam_role.github_actions[0].arn, null) :
+    null
+  ) : null
+}
+
+# -----------------------------------------------------------------------------
 # Next Steps
 # -----------------------------------------------------------------------------
 output "next_steps" {

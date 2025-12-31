@@ -92,14 +92,25 @@ $(terraform output -raw kubeconfig_command)
 
 ### Step 2: Configure CI/CD (Optional)
 
-Get GitHub Actions secrets from Terraform output:
+To enable GitHub Actions CI/CD with Workload Identity Federation, first enable it in your `terraform.tfvars`:
+
+```hcl
+# Add to your terraform.tfvars
+enable_github_actions_cicd = true
+github_repository          = "your-org/orbit"  # Format: owner/repo
+```
+
+Then re-apply Terraform and get the outputs:
 
 ```bash
+terraform apply
+
+# Get GitHub Actions secrets
 terraform output github_actions_workload_identity_provider
 terraform output github_actions_service_account
 ```
 
-Add to GitHub repository Settings → Secrets → Actions.
+Add these values to your GitHub repository Settings → Secrets and variables → Actions.
 
 ### Step 3: Deploy Application
 

@@ -262,6 +262,30 @@ variable "cluster_deletion_protection" {
 }
 
 # -----------------------------------------------------------------------------
+# GitHub Actions CI/CD Configuration
+# -----------------------------------------------------------------------------
+variable "enable_github_actions_cicd" {
+  description = "Enable GitHub Actions CI/CD with Workload Identity Federation"
+  type        = bool
+  default     = false
+}
+
+variable "github_repository" {
+  description = "GitHub repository in format 'owner/repo' for Workload Identity Federation"
+  type        = string
+  default     = ""
+}
+
+variable "github_actions_service_account_roles" {
+  description = "IAM roles to grant to the GitHub Actions service account (GCP only)"
+  type        = list(string)
+  default     = [
+    "roles/container.developer",
+    "roles/artifactregistry.writer"
+  ]
+}
+
+# -----------------------------------------------------------------------------
 # Tags/Labels
 # -----------------------------------------------------------------------------
 variable "tags" {

@@ -101,6 +101,13 @@ external_secrets_service_account = "external-secrets"
 secret_refresh_interval          = "1h"
 
 # -----------------------------------------------------------------------------
+# GitHub Actions CI/CD (Optional)
+# -----------------------------------------------------------------------------
+# Enable OIDC Federation for GitHub Actions deployments
+enable_github_actions_cicd = false
+# github_repository          = "your-org/orbit"  # Format: owner/repo
+
+# -----------------------------------------------------------------------------
 # Tags/Labels (lowercase for cross-cloud compatibility)
 # -----------------------------------------------------------------------------
 tags = {

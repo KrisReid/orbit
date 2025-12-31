@@ -271,6 +271,142 @@ resource "google_service_account_iam_member" "external_secrets_workload_identity
   member             = "serviceAccount:${var.gcp_config.project_id}.svc.id.goog[${var.external_secrets_namespace}/${var.external_secrets_service_account}]"
 }
 
+# =============================================================================
+# GitHub Actions CI/CD IAM (Workload Identity Federation)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# GCP: Workload Identity Pool for GitHub Actions
+# -----------------------------------------------------------------------------
+resource "google_iam_workload_identity_pool" "github" {
+  count                     = var.cloud_provider == "gcp" && var.enable_github_actions_cicd ? 1 : 0
+  workload_identity_pool_id = "${var.project_name}-github-pool"
+  display_name              = "GitHub Actions Pool"
+  description               = "Workload Identity Pool for GitHub Actions CI/CD"
+  project                   = var.gcp_config.project_id
+}
+
+resource "google_iam_workload_identity_pool_provider" "github" {
+  count                              = var.cloud_provider == "gcp" && var.enable_github_actions_cicd ? 1 : 0
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github[0].workload_identity_pool_id
+  workload_identity_pool_provider_id = "github-provider"
+  display_name                       = "GitHub Actions Provider"
+  project                            = var.gcp_config.project_id
+
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.actor"      = "assertion.actor"
+    "attribute.repository" = "assertion.repository"
+    "attribute.ref"        = "assertion.ref"
+  }
+
+  attribute_condition = var.github_repository != "" ? "assertion.repository == '${var.github_repository}'" : null
+
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+}
+
+resource "google_service_account" "github_actions" {
+  count        = var.cloud_provider == "gcp" && var.enable_github_actions_cicd ? 1 : 0
+  account_id   = "${var.project_name}-github-actions"
+  display_name = "GitHub Actions CI/CD for ${var.project_name}"
+  project      = var.gcp_config.project_id
+}
+
+resource "google_project_iam_member" "github_actions_roles" {
+  for_each = var.cloud_provider == "gcp" && var.enable_github_actions_cicd ? toset(var.github_actions_service_account_roles) : toset([])
+  project  = var.gcp_config.project_id
+  role     = each.value
+  member   = "serviceAccount:${google_service_account.github_actions[0].email}"
+}
+
+resource "google_service_account_iam_member" "github_actions_workload_identity" {
+  count              = var.cloud_provider == "gcp" && var.enable_github_actions_cicd && var.github_repository != "" ? 1 : 0
+  service_account_id = google_service_account.github_actions[0].name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github[0].name}/attribute.repository/${var.github_repository}"
+}
+
+# -----------------------------------------------------------------------------
+# AWS: OIDC Provider for GitHub Actions
+# -----------------------------------------------------------------------------
+data "aws_caller_identity" "current" {
+  count = var.cloud_provider == "aws" && var.enable_github_actions_cicd ? 1 : 0
+}
+
+data "tls_certificate" "github_actions" {
+  count = var.cloud_provider == "aws" && var.enable_github_actions_cicd ? 1 : 0
+  url   = "https://token.actions.githubusercontent.com"
+}
+
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  count           = var.cloud_provider == "aws" && var.enable_github_actions_cicd ? 1 : 0
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = [data.tls_certificate.github_actions[0].certificates[0].sha1_fingerprint]
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-github-actions-oidc"
+  })
+}
+
+resource "aws_iam_role" "github_actions" {
+  count = var.cloud_provider == "aws" && var.enable_github_actions_cicd ? 1 : 0
+  name  = "${var.project_name}-github-actions"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Effect = "Allow"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.github_actions[0].arn
+      }
+      Condition = var.github_repository != "" ? {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+        StringLike = {
+          "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
+        }
+      } : {
+        StringEquals = {
+          "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_ecr" {
+  count      = var.cloud_provider == "aws" && var.enable_github_actions_cicd ? 1 : 0
+  role       = aws_iam_role.github_actions[0].name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
+}
+
+resource "aws_iam_role_policy" "github_actions_eks" {
+  count = var.cloud_provider == "aws" && var.enable_github_actions_cicd ? 1 : 0
+  name  = "${var.project_name}-github-actions-eks"
+  role  = aws_iam_role.github_actions[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "eks:DescribeCluster",
+          "eks:ListClusters"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 # -----------------------------------------------------------------------------
 # Kubernetes Addons
 # -----------------------------------------------------------------------------
