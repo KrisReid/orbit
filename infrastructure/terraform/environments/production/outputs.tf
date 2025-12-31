@@ -111,6 +111,23 @@ output "kubernetes_secret_name" {
 }
 
 # -----------------------------------------------------------------------------
+# Container Registry Outputs
+# -----------------------------------------------------------------------------
+output "container_registry" {
+  description = "Container registry URL for pushing images"
+  value = var.cloud_provider == "gcp" ? "${var.region}-docker.pkg.dev/${var.gcp_config.project_id}/${var.project_name}" : (
+    var.cloud_provider == "aws" ? "${data.aws_caller_identity.current[0].account_id}.dkr.ecr.${var.region}.amazonaws.com/${var.project_name}" : null
+  )
+}
+
+output "container_registry_auth_command" {
+  description = "Command to authenticate with the container registry"
+  value = var.cloud_provider == "gcp" ? "gcloud auth configure-docker ${var.region}-docker.pkg.dev" : (
+    var.cloud_provider == "aws" ? "aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current[0].account_id}.dkr.ecr.${var.region}.amazonaws.com" : null
+  )
+}
+
+# -----------------------------------------------------------------------------
 # Provider-Specific Outputs
 # -----------------------------------------------------------------------------
 output "aws_outputs" {
@@ -185,27 +202,6 @@ output "next_steps" {
   value       = <<-EOT
     
     ✅ Infrastructure deployed successfully!
-    
-    📋 NEXT STEPS:
-    
-    1. Configure kubectl:
-       $(terraform output -raw kubeconfig_command)
-    
-    2. Access ArgoCD UI:
-       kubectl port-forward svc/argocd-server -n argocd 8080:80
-       Open: http://localhost:8080
-       Username: admin
-       Password: $(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
-    
-    3. Get Load Balancer IP:
-       kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-    
-    4. Configure DNS:
-       Point ${var.application_domain != "" ? var.application_domain : "your-domain.com"} to the load balancer IP
-    
-    5. Check application status:
-       kubectl get pods -n ${var.application_namespace}
-       kubectl get applications -n argocd
     
   EOT
 }

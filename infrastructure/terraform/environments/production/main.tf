@@ -45,12 +45,40 @@ resource "google_project_service" "main" {
     "sqladmin.googleapis.com",
     "secretmanager.googleapis.com",
     "iam.googleapis.com",
+    "artifactregistry.googleapis.com",
   ]) : toset([])
 
   project                    = var.gcp_config.project_id
   service                    = each.key
   disable_dependent_services = false
   disable_on_destroy         = false
+}
+
+# -----------------------------------------------------------------------------
+# GCP Artifact Registry (Container Images)
+# -----------------------------------------------------------------------------
+resource "google_artifact_registry_repository" "main" {
+  count         = var.cloud_provider == "gcp" ? 1 : 0
+  location      = var.region
+  repository_id = var.project_name
+  description   = "Container images for ${var.project_name}"
+  format        = "DOCKER"
+  project       = var.gcp_config.project_id
+
+  labels = local.common_tags
+
+  # Cleanup policy to remove old untagged images (optional cost savings)
+  cleanup_policy_dry_run = false
+  cleanup_policies {
+    id     = "delete-untagged"
+    action = "DELETE"
+    condition {
+      tag_state = "UNTAGGED"
+      older_than = "604800s" # 7 days
+    }
+  }
+
+  depends_on = [google_project_service.main]
 }
 
 # -----------------------------------------------------------------------------
@@ -276,11 +304,27 @@ resource "google_service_account_iam_member" "external_secrets_workload_identity
 # =============================================================================
 
 # -----------------------------------------------------------------------------
+# Random suffix for Workload Identity Pool (avoids 409 conflicts with soft-deleted pools)
+# -----------------------------------------------------------------------------
+# GCP Workload Identity Pools are soft-deleted for 30 days after destruction.
+# During this period, the pool ID cannot be reused. Using a random suffix ensures
+# unique pool IDs across deployments and prevents "entity already exists" errors.
+resource "random_id" "github_pool_suffix" {
+  count       = var.cloud_provider == "gcp" && var.enable_github_actions_cicd ? 1 : 0
+  byte_length = 4
+
+  # Only regenerate if the pool is actually destroyed and recreated
+  keepers = {
+    project_name = var.project_name
+  }
+}
+
+# -----------------------------------------------------------------------------
 # GCP: Workload Identity Pool for GitHub Actions
 # -----------------------------------------------------------------------------
 resource "google_iam_workload_identity_pool" "github" {
   count                     = var.cloud_provider == "gcp" && var.enable_github_actions_cicd ? 1 : 0
-  workload_identity_pool_id = "${var.project_name}-github-pool"
+  workload_identity_pool_id = "${var.project_name}-github-${random_id.github_pool_suffix[0].hex}"
   display_name              = "GitHub Actions Pool"
   description               = "Workload Identity Pool for GitHub Actions CI/CD"
   project                   = var.gcp_config.project_id
